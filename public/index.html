@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fitness Proof Timeline</title>
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 700px;
+      margin: 40px auto;
+    }
+
+    input, button {
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    .entry {
+      border: 1px solid #ddd;
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 6px;
+    }
+
+    .verified {
+      color: green;
+    }
+
+    .unverified {
+      color: orange;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Fitness Proof Timeline</h2>
+
+<input id="anonId" placeholder="Enter anonId" size="40">
+<button onclick="loadTimeline()">Load Timeline</button>
+
+<div id="timeline"></div>
+
+<script>
+async function loadTimeline() {
+  const anonId = document.getElementById("anonId").value;
+  if (!anonId) return alert("Enter anonId");
+
+  const res = await fetch(`/timeline/${anonId}`);
+  const data = await res.json();
+
+  const container = document.getElementById("timeline");
+  container.innerHTML = "";
+
+  if (!data.uploads.length) {
+    container.innerHTML = "<p>No uploads found.</p>";
+    return;
+  }
+
+  data.uploads.forEach(u => {
+    const div = document.createElement("div");
+    div.className = "entry";
+
+    const proof = u.proof.status === "verified"
+      ? `<span class="verified">Verified</span>
+         <br><a href="${u.proof.verifyUrl}" target="_blank">
+         View verification</a>`
+      : `<span class="unverified">Unverified</span>`;
+
+    div.innerHTML = `
+  <strong>${u.folder}</strong><br>
+  Uploaded: ${new Date(u.uploadedAt).toLocaleString()}<br>
+  <img src="/uploads/temp/${u.filename}" width="200"><br>
+  ${proof}
+`;
+
+
+    container.appendChild(div);
+  });
+}
+</script>
+
+</body>
+</html>

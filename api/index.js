@@ -9,6 +9,10 @@ const { storeFile } = require("../storage");
 
 const app = express();
 app.use(express.json());
+app.use(express.static("public"));
+app.use("/uploads", express.static("uploads"));
+
+
 
 // Ensure upload directory exists
 const uploadDir = "uploads/temp";
@@ -209,7 +213,7 @@ app.get("/debug/uploads", (req, res) => {
   res.json(rows);
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

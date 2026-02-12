@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Upload Fitness Photo</title>
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 600px;
+      margin: 40px auto;
+    }
+
+    #dropZone {
+      border: 2px dashed #888;
+      padding: 40px;
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h2>Upload Fitness Progress</h2>
+
+<label>Anon ID:</label><br>
+<input id="anonId" size="40"><br><br>
+
+<label>Folder (Week):</label><br>
+<input id="folder" value="Week 1"><br>
+
+<div id="dropZone">
+  Drag photo here
+</div>
+
+<button onclick="upload()">Upload</button>
+
+<p id="status"></p>
+
+<script>
+let selectedFile = null;
+
+const dropZone = document.getElementById("dropZone");
+
+dropZone.addEventListener("dragover", e => {
+  e.preventDefault();
+});
+
+dropZone.addEventListener("drop", e => {
+  e.preventDefault();
+  selectedFile = e.dataTransfer.files[0];
+  dropZone.innerText = selectedFile.name;
+});
+
+async function upload() {
+  if (!selectedFile) {
+    alert("Drop a file first");
+    return;
+  }
+
+  const anonId = document.getElementById("anonId").value;
+  const folder = document.getElementById("folder").value;
+
+  const formData = new FormData();
+  formData.append("photo", selectedFile);
+  formData.append("anonId", anonId);
+  formData.append("folder", folder);
+
+  const res = await fetch("/upload", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+
+  document.getElementById("status").innerText =
+    "Upload successful";
+}
+</script>
+
+</body>
+</html>
