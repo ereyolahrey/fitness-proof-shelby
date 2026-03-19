@@ -50,8 +50,10 @@ input, button {
 <input id="folder" value="Week 1"><br>
 
 <div id="dropZone">
-  Drag photo here
+  Click here or drag photo to upload
 </div>
+
+<input type="file" id="fileInput" accept="image/*" style="display:none;">
 
 <button onclick="upload()">Upload</button>
 
@@ -61,6 +63,18 @@ input, button {
 let selectedFile = null;
 
 const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+
+dropZone.addEventListener("click", () => {
+  fileInput.click();
+});
+
+fileInput.addEventListener("change", (e) => {
+  selectedFile = e.target.files[0];
+  if (selectedFile) {
+    dropZone.innerText = selectedFile.name;
+  }
+});
 
 dropZone.addEventListener("dragover", e => {
   e.preventDefault();
@@ -69,7 +83,9 @@ dropZone.addEventListener("dragover", e => {
 dropZone.addEventListener("drop", e => {
   e.preventDefault();
   selectedFile = e.dataTransfer.files[0];
-  dropZone.innerText = selectedFile.name;
+  if (selectedFile) {
+    dropZone.innerText = selectedFile.name;
+  }
 });
 
 async function upload() {

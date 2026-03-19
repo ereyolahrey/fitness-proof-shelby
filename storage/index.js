@@ -1,18 +1,18 @@
+const uploadToShelby = require("../shelby/upload");
 const localStorage = require("./local");
-const shelbyStorage = require("./shelby");
 
-// Toggle storage provider here
-const STORAGE_PROVIDER = process.env.STORAGE_PROVIDER || "local";
+const provider = process.env.STORAGE_PROVIDER || "local";
 
-async function storeFile({ filePath }) {
-  if (STORAGE_PROVIDER === "shelby") {
-    return shelbyStorage.storeFile({ filePath });
+console.log("STORAGE PROVIDER:", provider);
+
+async function storeFile(options) {
+  const filePath = options.filePath;
+
+  if (provider === "shelby") {
+    return await uploadToShelby(filePath);
   }
 
-  return localStorage.storeFile({ filePath });
+  return localStorage.storeFile(options);
 }
 
-module.exports = {
-  storeFile
-};
-console.log("STORAGE PROVIDER:", STORAGE_PROVIDER);
+module.exports = { storeFile };

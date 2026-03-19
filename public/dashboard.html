@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard - Fitness Proof</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <a href="/dashboard.html" class="brand">&#x1F4AA; Fitness Proof</a>
+    <div class="nav-actions">
+      <span class="user-badge" id="userBadge"></span>
+      <button class="btn btn-sm btn-outline" onclick="logout()">Log Out</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Wallet Connection -->
+    <div class="card mt-24">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="margin-bottom:4px;">Wallet</h2>
+          <p style="font-size:13px; color:var(--text2);">Connect your Aptos wallet to sign upload transactions on-chain.</p>
+        </div>
+        <button class="btn btn-wallet btn-sm" id="walletBtn" onclick="handleWallet()">Connect Wallet</button>
+      </div>
+      <div class="wallet-status mt-16" id="walletStatus" style="display:none;">
+        <span class="dot dot-connected"></span>
+        <span>Connected: </span>
+        <span class="wallet-addr" id="walletAddr"></span>
+      </div>
+      <div id="walletAlert" class="alert mt-8"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs mt-24">
+      <button class="tab active" data-tab="upload">Upload</button>
+      <button class="tab" data-tab="timeline">Timeline</button>
+    </div>
+
+    <!-- Upload Tab -->
+    <div class="tab-content active" id="tab-upload">
+      <div class="dash-grid">
+        <div class="card">
+          <h2>Upload Photo</h2>
+          <div class="form-group">
+            <label>Folder / Week</label>
+            <input type="text" id="folder" value="Week 1" placeholder="e.g. Week 1">
+          </div>
+          <div class="dropzone" id="dropzone">
+            <div class="icon">&#128247;</div>
+            <div>Click or drag a photo here</div>
+          </div>
+          <input type="file" id="fileInput" accept="image/*" style="display:none;">
+          <div id="fileName" class="mt-8" style="font-size:13px; color:var(--text2);"></div>
+          <button class="btn btn-primary btn-block mt-16" id="uploadBtn" onclick="startUpload()" disabled>
+            Upload &amp; Sign Transaction
+          </button>
+        </div>
+
+        <div class="card">
+          <h2>Upload Progress</h2>
+          <div class="upload-progress" id="uploadProgress">
+            <div class="step step-pending" id="step-upload">
+              <span class="status">1</span>
+              <span>Uploading file to server...</span>
+            </div>
+            <div class="step step-pending" id="step-commit">
+              <span class="status">2</span>
+              <span>Generating Shelby commitments...</span>
+            </div>
+            <div class="step step-pending" id="step-sign">
+              <span class="status">3</span>
+              <span>Sign transaction in wallet...</span>
+            </div>
+            <div class="step step-pending" id="step-store">
+              <span class="status">4</span>
+              <span>Storing blob on Shelby network...</span>
+            </div>
+            <div class="step step-pending" id="step-done">
+              <span class="status">5</span>
+              <span>Complete! Proof recorded on-chain.</span>
+            </div>
+          </div>
+          <div id="uploadAlert" class="alert mt-8"></div>
+          <div id="txResult" class="hidden mt-16" style="font-size:13px;">
+            <p><strong>Transaction Hash:</strong></p>
+            <a id="txLink" href="#" target="_blank" class="link" style="word-break:break-all;"></a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline Tab -->
+    <div class="tab-content" id="tab-timeline">
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h2>Your Progress Timeline</h2>
+          <button class="btn btn-sm btn-outline" onclick="loadTimeline()">Refresh</button>
+        </div>
+        <div id="timelineContainer" class="timeline">
+          <p style="color:var(--text2); font-size:14px;">Loading...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ───── Auth Guard ───── */
+    const token = localStorage.getItem("token");
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    if (!token || !user) { window.location.href = "/login.html"; }
+    document.getElementById("userBadge").textContent = user.username || user.email;
+
+    function logout() {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login.html";
+    }
+
+    function authHeaders() { return { "Authorization": "Bearer " + token }; }
+
+    /* ───── Tabs ───── */
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+        if (tab.dataset.tab === "timeline") loadTimeline();
+      });
+    });
+
+    /* ───── Wallet Standard Discovery ───── */
+    // Implements the wallet-standard protocol inline (no build tools needed).
+    // Wallets (Petra, etc.) register via events; we discover them here.
+    const walletsApi = (() => {
+      const wallets = [];
+      const listeners = [];
+
+      function register(...newWallets) {
+        wallets.push(...newWallets);
+        newWallets.forEach(w => listeners.forEach(l => l(w)));
+      }
+
+      const api = {
+        register,
+        get: () => [...wallets],
+        on: (cb) => {
+          listeners.push(cb);
+          return () => { const i = listeners.indexOf(cb); if (i >= 0) listeners.splice(i, 1); };
+        }
+      };
+
+      // Listen for wallets that register AFTER this script runs
+      try {
+        window.addEventListener("wallet-standard:register-wallet", (e) => {
+          if (typeof e.detail === "function") e.detail(api);
+        });
+      } catch (_) {}
+
+      // Notify wallets that are already loaded to register with us
+      try {
+        const event = new Event("wallet-standard:app-ready");
+        Object.defineProperty(event, "detail", { value: api });
+        window.dispatchEvent(event);
+      } catch (_) {}
+
+      return api;
+    })();
+
+    let connectedWallet = null;
+    let connectedAccount = null;
+    let walletAddress = null;
+
+    function findAptosWallet() {
+      return walletsApi.get().find(w =>
+        w.features && w.features["aptos:connect"] && w.features["aptos:signAndSubmitTransaction"]
+      );
+    }
+
+    async function handleWallet() {
+      // Disconnect flow
+      if (connectedWallet && walletAddress) {
+        try {
+          const disc = connectedWallet.features["aptos:disconnect"];
+          if (disc) await disc.disconnect();
+        } catch (_) {}
+        connectedWallet = null;
+        connectedAccount = null;
+        walletAddress = null;
+        document.getElementById("walletStatus").style.display = "none";
+        document.getElementById("walletBtn").textContent = "Connect Wallet";
+        updateUploadBtn();
+        await fetch("/auth/wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ walletAddress: null })
+        });
+        return;
+      }
+
+      // Connect flow
+      let wallet = findAptosWallet();
+
+      // If no wallet found yet, wait briefly for late-registering extensions
+      if (!wallet) {
+        wallet = await new Promise(resolve => {
+          const unsub = walletsApi.on((w) => {
+            if (w.features && w.features["aptos:connect"] && w.features["aptos:signAndSubmitTransaction"]) {
+              unsub();
+              resolve(w);
+            }
+          });
+          setTimeout(() => { unsub(); resolve(null); }, 1500);
+        });
+      }
+
+      if (!wallet) {
+        showWalletAlert("No Aptos wallet found. Install Petra from petra.app", "error");
+        window.open("https://petra.app", "_blank");
+        return;
+      }
+
+      try {
+        const connectFeature = wallet.features["aptos:connect"];
+        const result = await connectFeature.connect();
+        const accounts = result.accounts || [];
+
+        if (accounts.length === 0) {
+          showWalletAlert("No accounts returned from wallet.", "error");
+          return;
+        }
+
+        connectedWallet = wallet;
+        connectedAccount = accounts[0];
+        walletAddress = connectedAccount.address;
+
+        document.getElementById("walletAddr").textContent = walletAddress;
+        document.getElementById("walletStatus").style.display = "flex";
+        document.getElementById("walletBtn").textContent = "Disconnect";
+        showWalletAlert("", "");
+
+        await fetch("/auth/wallet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ walletAddress })
+        });
+
+        updateUploadBtn();
+      } catch (err) {
+        showWalletAlert("Wallet connection failed: " + err.message, "error");
+      }
+    }
+
+    function showWalletAlert(msg, type) {
+      const el = document.getElementById("walletAlert");
+      if (!msg) { el.className = "alert mt-8"; el.textContent = ""; return; }
+      el.textContent = msg;
+      el.className = "alert alert-" + type + " mt-8";
+    }
+
+    // Auto-reconnect: check if wallet is already connected on page load
+    (async () => {
+      // Give extensions a moment to register
+      await new Promise(r => setTimeout(r, 300));
+      const wallet = findAptosWallet();
+      if (wallet && wallet.accounts && wallet.accounts.length > 0) {
+        connectedWallet = wallet;
+        connectedAccount = wallet.accounts[0];
+        walletAddress = connectedAccount.address;
+        document.getElementById("walletAddr").textContent = walletAddress;
+        document.getElementById("walletStatus").style.display = "flex";
+        document.getElementById("walletBtn").textContent = "Disconnect";
+        updateUploadBtn();
+      }
+    })();
+
+    /* ───── File Selection ───── */
+    let selectedFile = null;
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+
+    dropzone.addEventListener("click", () => fileInput.click());
+    dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("active"); });
+    dropzone.addEventListener("dragleave", () => dropzone.classList.remove("active"));
+    dropzone.addEventListener("drop", e => {
+      e.preventDefault(); dropzone.classList.remove("active");
+      if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener("change", e => {
+      if (e.target.files[0]) selectFile(e.target.files[0]);
+    });
+
+    function selectFile(file) {
+      if (!file.type.startsWith("image/")) {
+        showUploadAlert("Only image files are allowed", "error");
+        return;
+      }
+      selectedFile = file;
+      document.getElementById("fileName").textContent = file.name + " (" + (file.size / 1024).toFixed(1) + " KB)";
+      dropzone.innerHTML = '<div class="icon">&#9989;</div><div>' + file.name + '</div>';
+      updateUploadBtn();
+    }
+
+    function updateUploadBtn() {
+      document.getElementById("uploadBtn").disabled = !(selectedFile && walletAddress);
+    }
+
+    /* ───── Upload Flow ───── */
+    function setStep(id, state) {
+      const el = document.getElementById(id);
+      el.className = "step step-" + state;
+      const statusEl = el.querySelector(".status");
+      if (state === "done") statusEl.textContent = "✓";
+      else if (state === "error") statusEl.textContent = "✗";
+      else if (state === "active") statusEl.innerHTML = '<span class="spinner"></span>';
+    }
+
+    function resetSteps() {
+      ["step-upload","step-commit","step-sign","step-store","step-done"].forEach(id => {
+        setStep(id, "pending");
+        const el = document.getElementById(id);
+        el.querySelector(".status").textContent = el === document.getElementById("step-upload") ? "1"
+          : el === document.getElementById("step-commit") ? "2"
+          : el === document.getElementById("step-sign") ? "3"
+          : el === document.getElementById("step-store") ? "4" : "5";
+      });
+    }
+
+    function showUploadAlert(msg, type) {
+      const el = document.getElementById("uploadAlert");
+      if (!msg) { el.className = "alert mt-8"; el.textContent = ""; return; }
+      el.textContent = msg;
+      el.className = "alert alert-" + type + " mt-8";
+    }
+
+    async function startUpload() {
+      if (!selectedFile || !walletAddress) return;
+
+      const folder = document.getElementById("folder").value.trim() || "Unsorted";
+      const uploadBtn = document.getElementById("uploadBtn");
+      const progressEl = document.getElementById("uploadProgress");
+      const txResult = document.getElementById("txResult");
+
+      uploadBtn.disabled = true;
+      progressEl.style.display = "block";
+      txResult.classList.add("hidden");
+      showUploadAlert("", "");
+      resetSteps();
+
+      try {
+        // Step 1: Upload file to server
+        setStep("step-upload", "active");
+        const formData = new FormData();
+        formData.append("photo", selectedFile);
+        formData.append("folder", folder);
+        formData.append("walletAddress", walletAddress);
+
+        const prepareRes = await fetch("/upload/prepare", {
+          method: "POST",
+          headers: authHeaders(),
+          body: formData
+        });
+        const prepareData = await prepareRes.json();
+        if (!prepareRes.ok) throw new Error(prepareData.error || "Upload failed");
+        setStep("step-upload", "done");
+
+        // Step 2: Commitments generated (server-side)
+        setStep("step-commit", "done");
+
+        // Step 3: Sign transaction in wallet (Aptos Wallet Standard)
+        setStep("step-sign", "active");
+        const txPayload = prepareData.txPayload;
+
+        let txHash;
+        try {
+          const signFeature = connectedWallet.features["aptos:signAndSubmitTransaction"];
+          const result = await signFeature.signAndSubmitTransaction({
+            payload: {
+              function: txPayload.function,
+              functionArguments: txPayload.functionArguments,
+            }
+          });
+          // Handle different response formats across wallet versions
+          txHash = result.hash || (result.args && result.args.hash);
+          if (!txHash) throw new Error("No transaction hash returned");
+        } catch (walletErr) {
+          if (walletErr.message && (walletErr.message.includes("rejected") || walletErr.message.includes("Rejected"))) {
+            throw new Error("Transaction was rejected by the user");
+          }
+          throw new Error("Wallet signing failed: " + walletErr.message);
+        }
+        setStep("step-sign", "done");
+
+        // Step 4: Confirm upload with server (server does putBlob to Shelby RPC)
+        setStep("step-store", "active");
+        const confirmRes = await fetch("/upload/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({
+            uploadId: prepareData.uploadId,
+            txHash: txHash,
+            blobName: prepareData.blobName
+          })
+        });
+        const confirmData = await confirmRes.json();
+        if (!confirmRes.ok) throw new Error(confirmData.error || "Confirmation failed");
+        setStep("step-store", "done");
+
+        // Step 5: Done
+        setStep("step-done", "done");
+        showUploadAlert("Upload verified on-chain!", "success");
+
+        // Show transaction link
+        txResult.classList.remove("hidden");
+        const txLink = document.getElementById("txLink");
+        txLink.href = "https://explorer.aptoslabs.com/txn/" + txHash + "?network=testnet";
+        txLink.textContent = txHash;
+
+        // Reset file selection
+        selectedFile = null;
+        document.getElementById("fileName").textContent = "";
+        dropzone.innerHTML = '<div class="icon">&#128247;</div><div>Click or drag a photo here</div>';
+        fileInput.value = "";
+        updateUploadBtn();
+
+      } catch (err) {
+        const steps = ["step-upload","step-commit","step-sign","step-store","step-done"];
+        const activeStep = steps.find(s => document.getElementById(s).classList.contains("step-active"));
+        if (activeStep) setStep(activeStep, "error");
+        showUploadAlert(err.message, "error");
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    }
+
+    /* ───── Timeline ───── */
+    async function loadTimeline() {
+      const container = document.getElementById("timelineContainer");
+      container.innerHTML = '<p style="color:var(--text2); font-size:14px;">Loading...</p>';
+
+      try {
+        const res = await fetch("/timeline", { headers: authHeaders() });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error);
+        if (!data.uploads || data.uploads.length === 0) {
+          container.innerHTML = '<p style="color:var(--text2); font-size:14px;">No uploads yet. Start by uploading a progress photo!</p>';
+          return;
+        }
+
+        container.innerHTML = data.uploads.map(u => `
+          <div class="timeline-item">
+            <div class="thumb">${u.hasFile ? '<img src="/uploads/temp/' + u.filename + '" alt="">' : '&#128247;'}</div>
+            <div class="info">
+              <h4>${u.folder}</h4>
+              <div class="meta">
+                ${new Date(u.uploadedAt).toLocaleDateString()} &middot; ${(u.size / 1024).toFixed(1)} KB
+                ${u.txHash ? '<br><a href="https://explorer.aptoslabs.com/txn/' + u.txHash + '?network=testnet" target="_blank">View on Aptos Explorer &#x2197;</a>' : ''}
+                ${u.blobId ? '<br><a href="https://api.testnet.shelby.xyz/shelby/v1/blobs/' + (u.walletAddress || '') + '/' + u.blobId + '" target="_blank">View on Shelby &#x2197;</a>' : ''}
+              </div>
+              <div class="mt-8">
+                ${u.blobId && u.commitment
+                  ? '<span class="proof-badge proof-verified">&#x2713; Verified On-Chain</span>'
+                  : '<span class="proof-badge proof-unverified">&#x25CB; Unverified</span>'}
+              </div>
+            </div>
+          </div>
+        `).join("");
+      } catch (err) {
+        container.innerHTML = '<p style="color:var(--error); font-size:14px;">Failed to load timeline.</p>';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -8,6 +8,7 @@ const db = new Database(dbPath);
 db.prepare(`
   CREATE TABLE IF NOT EXISTS uploads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER,
     anonId TEXT,
     folder TEXT,
     filename TEXT,
@@ -15,13 +16,28 @@ db.prepare(`
     uploadedAt TEXT
   )
 `).run();
-// Add Shelby proof columns if they don't exist
-try {
-  db.prepare(`ALTER TABLE uploads ADD COLUMN blobId TEXT`).run();
-} catch (e) {}
 
-try {
-  db.prepare(`ALTER TABLE uploads ADD COLUMN commitment TEXT`).run();
-} catch (e) {}
+// Create users table
+db.prepare(`
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE,
+  username TEXT UNIQUE,
+  passwordHash TEXT,
+  walletAddress TEXT,
+  createdAt TEXT
+)
+`).run();
+
+// Add columns if they don't exist (migration-safe)
+const addColumnSafe = (table, column, type) => {
+  try { db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`).run(); } catch (e) {}
+};
+
+addColumnSafe("uploads", "blobId", "TEXT");
+addColumnSafe("uploads", "commitment", "TEXT");
+addColumnSafe("uploads", "txHash", "TEXT");
+addColumnSafe("uploads", "walletAddress", "TEXT");
+addColumnSafe("uploads", "userId", "INTEGER");
 
 module.exports = db;
