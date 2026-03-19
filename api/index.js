@@ -5,7 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const db = require("../db/database");
 
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
@@ -314,6 +314,9 @@ app.get("/verify/:blobId", (req, res) => {
     upload: { folder: row.folder, filename: row.filename, uploadedAt: row.uploadedAt }
   });
 });
+
+//  Health check (for Render) 
+app.get("/health", (req, res) => res.json({ status: "ok" }));
 
 //  Debug 
 app.get("/debug/uploads", (req, res) => {
