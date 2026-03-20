@@ -40,4 +40,13 @@ addColumnSafe("uploads", "txHash", "TEXT");
 addColumnSafe("uploads", "walletAddress", "TEXT");
 addColumnSafe("uploads", "userId", "INTEGER");
 
+// Activity metadata columns
+addColumnSafe("uploads", "activityType", "TEXT");
+addColumnSafe("uploads", "activityTitle", "TEXT");
+addColumnSafe("uploads", "activityDistance", "REAL");
+addColumnSafe("uploads", "activityDuration", "INTEGER");
+addColumnSafe("uploads", "activityCalories", "INTEGER");
+addColumnSafe("uploads", "activityHeartRate", "INTEGER");
+addColumnSafe("uploads", "activityNotes", "TEXT");
+
 module.exports = db;

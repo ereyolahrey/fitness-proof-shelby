@@ -1,16 +1,20 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Log In - Fitness Proof</title>
+  <title>Log In — FitnessProof</title>
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
   <div class="auth-container">
     <div class="auth-card">
+      <a href="/" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--text2);font-size:14px;margin-bottom:24px;">
+        <span style="font-size:20px;">&#x26A1;</span>
+        <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--text);">FitnessProof</span>
+      </a>
       <h1>Welcome Back</h1>
-      <p class="subtitle">Log in to your Fitness Proof dashboard.</p>
+      <p class="subtitle">Log in to your dashboard and keep proving it.</p>
       <div id="alert" class="alert"></div>
       <form id="loginForm">
         <div class="form-group">
@@ -29,42 +33,28 @@
     </div>
   </div>
   <script>
+    if (localStorage.getItem("token")) window.location.href = "/dashboard.html";
     const form = document.getElementById("loginForm");
     const alertEl = document.getElementById("alert");
     const submitBtn = document.getElementById("submitBtn");
-    function showAlert(msg, type) {
-      alertEl.textContent = msg;
-      alertEl.className = "alert alert-" + type;
-    }
-    if (localStorage.getItem("token")) {
-      window.location.href = "/dashboard.html";
-    }
+    function showAlert(msg, type) { alertEl.textContent = msg; alertEl.className = "alert alert-" + type; }
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Logging in...";
+      submitBtn.disabled = true; submitBtn.textContent = "Logging in...";
       try {
         const res = await fetch("/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password })
         });
         const data = await res.json();
-        if (!res.ok) {
-          showAlert(data.error || "Login failed", "error");
-          return;
-        }
+        if (!res.ok) { showAlert(data.error || "Login failed", "error"); return; }
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
         window.location.href = "/dashboard.html";
-      } catch (err) {
-        showAlert("Network error. Please try again.", "error");
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Log In";
-      }
+      } catch (err) { showAlert("Network error. Please try again.", "error"); }
+      finally { submitBtn.disabled = false; submitBtn.textContent = "Log In"; }
     });
   </script>
 </body>

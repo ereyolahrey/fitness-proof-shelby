@@ -3,13 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Dashboard - Fitness Proof</title>
+  <title>Dashboard — FitnessProof</title>
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
   <!-- Navbar -->
   <nav class="navbar">
-    <a href="/dashboard.html" class="brand">&#x1F4AA; Fitness Proof</a>
+    <a href="/dashboard.html" class="brand">
+      <span class="logo-icon">&#x26A1;</span>
+      FitnessProof
+    </a>
     <div class="nav-actions">
       <span class="user-badge" id="userBadge"></span>
       <button class="btn btn-sm btn-outline" onclick="logout()">Log Out</button>
@@ -17,55 +20,112 @@
   </nav>
 
   <div class="container">
-    <!-- Wallet Connection -->
-    <div class="card mt-24">
-      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-        <div>
-          <h2 style="margin-bottom:4px;">Wallet</h2>
-          <p style="font-size:13px; color:var(--text2);">Connect your Aptos wallet to sign upload transactions on-chain.</p>
-        </div>
-        <button class="btn btn-wallet btn-sm" id="walletBtn" onclick="handleWallet()">Connect Wallet</button>
+    <!-- Wallet -->
+    <div class="wallet-card mt-24" id="walletCard">
+      <div class="wallet-icon">&#x1F3AF;</div>
+      <div class="wallet-info">
+        <h3 id="walletTitle">Connect Petra Wallet</h3>
+        <div class="wallet-label" id="walletLabel">Sign transactions to prove your workouts on-chain</div>
+        <div class="addr" id="walletAddr" style="display:none;"></div>
       </div>
-      <div class="wallet-status mt-16" id="walletStatus" style="display:none;">
-        <span class="dot dot-connected"></span>
-        <span>Connected: </span>
-        <span class="wallet-addr" id="walletAddr"></span>
+      <button class="btn btn-wallet btn-sm" id="walletBtn" onclick="handleWallet()">Connect</button>
+    </div>
+    <div id="walletAlert" class="alert"></div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card stat-activities">
+        <div class="stat-icon">&#x1F4AA;</div>
+        <div class="stat-value" id="statActivities">0</div>
+        <div class="stat-label">Activities</div>
       </div>
-      <div id="walletAlert" class="alert mt-8"></div>
+      <div class="stat-card stat-distance">
+        <div class="stat-icon">&#x1F3C3;</div>
+        <div class="stat-value" id="statDistance">0 km</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-card stat-onchain">
+        <div class="stat-icon">&#x1F517;</div>
+        <div class="stat-value" id="statOnchain">0</div>
+        <div class="stat-label">On-Chain</div>
+      </div>
+      <div class="stat-card stat-streak">
+        <div class="stat-icon">&#x1F525;</div>
+        <div class="stat-value" id="statStreak">0</div>
+        <div class="stat-label">Day Streak</div>
+      </div>
     </div>
 
     <!-- Tabs -->
-    <div class="tabs mt-24">
-      <button class="tab active" data-tab="upload">Upload</button>
-      <button class="tab" data-tab="timeline">Timeline</button>
+    <div class="tabs">
+      <button class="tab active" data-tab="record">Record</button>
+      <button class="tab" data-tab="feed">Activity Feed</button>
+      <button class="tab" data-tab="photos">Photos</button>
     </div>
 
-    <!-- Upload Tab -->
-    <div class="tab-content active" id="tab-upload">
+    <!-- ═══ Record Tab ═══ -->
+    <div class="tab-content active" id="tab-record">
       <div class="dash-grid">
+        <!-- Activity Form -->
         <div class="card">
-          <h2>Upload Photo</h2>
+          <h2>&#x1F3CB; Log Activity</h2>
+          <div class="type-selector" id="typeSelector">
+            <button class="type-btn active" data-type="run">&#x1F3C3; Run</button>
+            <button class="type-btn" data-type="ride">&#x1F6B4; Ride</button>
+            <button class="type-btn" data-type="workout">&#x1F4AA; Workout</button>
+            <button class="type-btn" data-type="swim">&#x1F3CA; Swim</button>
+            <button class="type-btn" data-type="yoga">&#x1F9D8; Yoga</button>
+            <button class="type-btn" data-type="other">&#x2B50; Other</button>
+          </div>
           <div class="form-group">
-            <label>Folder / Week</label>
-            <input type="text" id="folder" value="Week 1" placeholder="e.g. Week 1">
+            <label>Activity Title</label>
+            <input type="text" id="actTitle" placeholder="e.g. Morning 5K Run" required>
           </div>
-          <div class="dropzone" id="dropzone">
-            <div class="icon">&#128247;</div>
-            <div>Click or drag a photo here</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Distance (km)</label>
+              <input type="number" id="actDistance" step="0.01" placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label>Duration (min)</label>
+              <input type="number" id="actDuration" placeholder="0">
+            </div>
           </div>
-          <input type="file" id="fileInput" accept="image/*" style="display:none;">
-          <div id="fileName" class="mt-8" style="font-size:13px; color:var(--text2);"></div>
-          <button class="btn btn-primary btn-block mt-16" id="uploadBtn" onclick="startUpload()" disabled>
-            Upload &amp; Sign Transaction
+          <div class="form-row">
+            <div class="form-group">
+              <label>Calories</label>
+              <input type="number" id="actCalories" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label>Heart Rate (avg bpm)</label>
+              <input type="number" id="actHeartRate" placeholder="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Notes</label>
+            <textarea id="actNotes" placeholder="How did you feel? Any PRs?"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Photo (optional)</label>
+            <div class="dropzone" id="actDropzone" style="padding:24px 16px;">
+              <div class="icon" style="font-size:28px;">&#x1F4F7;</div>
+              <div style="font-size:13px;">Click or drop a photo</div>
+            </div>
+            <input type="file" id="actFileInput" accept="image/*" style="display:none;">
+            <div id="actFileName" class="mt-4" style="font-size:12px; color:var(--text2);"></div>
+          </div>
+          <button class="btn btn-primary btn-block" id="logActivityBtn" onclick="logActivity()">
+            Log Activity &amp; Store On-Chain
           </button>
         </div>
 
+        <!-- Upload Progress -->
         <div class="card">
-          <h2>Upload Progress</h2>
+          <h2>&#x1F680; Transaction Progress</h2>
           <div class="upload-progress" id="uploadProgress">
-            <div class="step step-pending" id="step-upload">
+            <div class="step step-pending" id="step-prepare">
               <span class="status">1</span>
-              <span>Uploading file to server...</span>
+              <span>Preparing activity data...</span>
             </div>
             <div class="step step-pending" id="step-commit">
               <span class="status">2</span>
@@ -73,53 +133,82 @@
             </div>
             <div class="step step-pending" id="step-sign">
               <span class="status">3</span>
-              <span>Sign transaction in wallet...</span>
+              <span>Sign transaction in Petra...</span>
             </div>
             <div class="step step-pending" id="step-store">
               <span class="status">4</span>
-              <span>Storing blob on Shelby network...</span>
+              <span>Storing on Shelby network...</span>
             </div>
             <div class="step step-pending" id="step-done">
               <span class="status">5</span>
-              <span>Complete! Proof recorded on-chain.</span>
+              <span>Verified on-chain! &#x1F389;</span>
             </div>
           </div>
           <div id="uploadAlert" class="alert mt-8"></div>
           <div id="txResult" class="hidden mt-16" style="font-size:13px;">
-            <p><strong>Transaction Hash:</strong></p>
+            <p style="color:var(--text2); margin-bottom:4px;">Transaction Hash:</p>
             <a id="txLink" href="#" target="_blank" class="link" style="word-break:break-all;"></a>
+          </div>
+
+          <!-- Fitness tips while waiting -->
+          <div class="mt-24" style="border-top:1px solid var(--border); padding-top:20px;">
+            <h3 style="font-size:14px; color:var(--text2); margin-bottom:12px;">&#x1F4A1; Fitness Tip</h3>
+            <p id="fitnessTip" style="font-size:13px; color:var(--text3); line-height:1.6;"></p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Timeline Tab -->
-    <div class="tab-content" id="tab-timeline">
+    <!-- ═══ Feed Tab ═══ -->
+    <div class="tab-content" id="tab-feed">
       <div class="card">
-        <div style="display:flex; align-items:center; justify-content:space-between;">
-          <h2>Your Progress Timeline</h2>
-          <button class="btn btn-sm btn-outline" onclick="loadTimeline()">Refresh</button>
+        <div class="flex-between mb-16">
+          <h2 style="margin-bottom:0;">Your Activity Feed</h2>
+          <button class="btn btn-xs btn-outline" onclick="loadFeed()">Refresh</button>
         </div>
-        <div id="timelineContainer" class="timeline">
-          <p style="color:var(--text2); font-size:14px;">Loading...</p>
+        <div id="feedContainer">
+          <div class="empty-state">
+            <div class="empty-icon">&#x1F3C3;</div>
+            <h3>No activities yet</h3>
+            <p>Log your first workout to see it appear here with on-chain proof.</p>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- ═══ Photos Tab ═══ -->
+    <div class="tab-content" id="tab-photos">
+      <div class="card">
+        <div class="flex-between mb-16">
+          <h2 style="margin-bottom:0;">Progress Photos</h2>
+          <button class="btn btn-xs btn-outline" onclick="loadFeed()">Refresh</button>
+        </div>
+        <div id="photosContainer">
+          <div class="empty-state">
+            <div class="empty-icon">&#x1F4F8;</div>
+            <h3>No photos yet</h3>
+            <p>Attach a photo to your next activity to track visual progress.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>FitnessProof &middot; All activities verified on <a href="https://shelby.xyz" target="_blank">Shelby</a> &amp; <a href="https://aptoslabs.com" target="_blank">Aptos</a></p>
   </div>
 
   <script>
     /* ───── Auth Guard ───── */
     const token = localStorage.getItem("token");
     const user = JSON.parse(localStorage.getItem("user") || "null");
-    if (!token || !user) { window.location.href = "/login.html"; }
-    document.getElementById("userBadge").textContent = user.username || user.email;
+    if (!token || !user) window.location.href = "/login.html";
+    document.getElementById("userBadge").textContent = user?.username || user?.email || "";
 
     function logout() {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      localStorage.removeItem("token"); localStorage.removeItem("user");
       window.location.href = "/login.html";
     }
-
     function authHeaders() { return { "Authorization": "Bearer " + token }; }
 
     /* ───── Tabs ───── */
@@ -129,127 +218,63 @@
         document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
         tab.classList.add("active");
         document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
-        if (tab.dataset.tab === "timeline") loadTimeline();
+        if (tab.dataset.tab === "feed" || tab.dataset.tab === "photos") loadFeed();
       });
     });
 
-    /* ───── Wallet Standard Discovery ───── */
-    // Implements the wallet-standard protocol inline (no build tools needed).
-    // Wallets (Petra, etc.) register via events; we discover them here.
-    const walletsApi = (() => {
-      const wallets = [];
-      const listeners = [];
+    /* ───── Activity Type Selection ───── */
+    let selectedType = "run";
+    document.querySelectorAll(".type-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".type-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        selectedType = btn.dataset.type;
+      });
+    });
 
-      function register(...newWallets) {
-        wallets.push(...newWallets);
-        newWallets.forEach(w => listeners.forEach(l => l(w)));
-      }
-
-      const api = {
-        register,
-        get: () => [...wallets],
-        on: (cb) => {
-          listeners.push(cb);
-          return () => { const i = listeners.indexOf(cb); if (i >= 0) listeners.splice(i, 1); };
-        }
-      };
-
-      // Listen for wallets that register AFTER this script runs
-      try {
-        window.addEventListener("wallet-standard:register-wallet", (e) => {
-          if (typeof e.detail === "function") e.detail(api);
-        });
-      } catch (_) {}
-
-      // Notify wallets that are already loaded to register with us
-      try {
-        const event = new Event("wallet-standard:app-ready");
-        Object.defineProperty(event, "detail", { value: api });
-        window.dispatchEvent(event);
-      } catch (_) {}
-
-      return api;
-    })();
-
-    let connectedWallet = null;
-    let connectedAccount = null;
+    /* ───── Petra Wallet — Direct API (most reliable) ───── */
     let walletAddress = null;
 
-    function findAptosWallet() {
-      return walletsApi.get().find(w =>
-        w.features && w.features["aptos:connect"] && w.features["aptos:signAndSubmitTransaction"]
-      );
+    function getPetra() {
+      return window.petra || window.aptos;
     }
 
     async function handleWallet() {
-      // Disconnect flow
-      if (connectedWallet && walletAddress) {
-        try {
-          const disc = connectedWallet.features["aptos:disconnect"];
-          if (disc) await disc.disconnect();
-        } catch (_) {}
-        connectedWallet = null;
-        connectedAccount = null;
+      if (walletAddress) {
+        // Disconnect
+        try { const p = getPetra(); if (p) await p.disconnect(); } catch (_) {}
         walletAddress = null;
-        document.getElementById("walletStatus").style.display = "none";
-        document.getElementById("walletBtn").textContent = "Connect Wallet";
-        updateUploadBtn();
+        document.getElementById("walletTitle").textContent = "Connect Petra Wallet";
+        document.getElementById("walletLabel").style.display = "";
+        document.getElementById("walletAddr").style.display = "none";
+        document.getElementById("walletBtn").textContent = "Connect";
         await fetch("/auth/wallet", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
+          method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify({ walletAddress: null })
         });
         return;
       }
 
-      // Connect flow
-      let wallet = findAptosWallet();
-
-      // If no wallet found yet, wait briefly for late-registering extensions
-      if (!wallet) {
-        wallet = await new Promise(resolve => {
-          const unsub = walletsApi.on((w) => {
-            if (w.features && w.features["aptos:connect"] && w.features["aptos:signAndSubmitTransaction"]) {
-              unsub();
-              resolve(w);
-            }
-          });
-          setTimeout(() => { unsub(); resolve(null); }, 1500);
-        });
-      }
-
-      if (!wallet) {
-        showWalletAlert("No Aptos wallet found. Install Petra from petra.app", "error");
+      const petra = getPetra();
+      if (!petra) {
+        showWalletAlert("Petra wallet not detected. Install it from petra.app", "error");
         window.open("https://petra.app", "_blank");
         return;
       }
 
       try {
-        const connectFeature = wallet.features["aptos:connect"];
-        const result = await connectFeature.connect();
-        const accounts = result.accounts || [];
-
-        if (accounts.length === 0) {
-          showWalletAlert("No accounts returned from wallet.", "error");
-          return;
-        }
-
-        connectedWallet = wallet;
-        connectedAccount = accounts[0];
-        walletAddress = connectedAccount.address;
-
-        document.getElementById("walletAddr").textContent = walletAddress;
-        document.getElementById("walletStatus").style.display = "flex";
+        const resp = await petra.connect();
+        walletAddress = resp.address;
+        document.getElementById("walletTitle").textContent = "Petra Connected";
+        document.getElementById("walletLabel").style.display = "none";
+        document.getElementById("walletAddr").textContent = walletAddress.slice(0, 8) + "..." + walletAddress.slice(-6);
+        document.getElementById("walletAddr").style.display = "";
         document.getElementById("walletBtn").textContent = "Disconnect";
         showWalletAlert("", "");
-
         await fetch("/auth/wallet", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
+          method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify({ walletAddress })
         });
-
-        updateUploadBtn();
       } catch (err) {
         showWalletAlert("Wallet connection failed: " + err.message, "error");
       }
@@ -257,31 +282,34 @@
 
     function showWalletAlert(msg, type) {
       const el = document.getElementById("walletAlert");
-      if (!msg) { el.className = "alert mt-8"; el.textContent = ""; return; }
-      el.textContent = msg;
-      el.className = "alert alert-" + type + " mt-8";
+      if (!msg) { el.className = "alert"; el.textContent = ""; return; }
+      el.textContent = msg; el.className = "alert alert-" + type;
     }
 
-    // Auto-reconnect: check if wallet is already connected on page load
+    // Auto-reconnect on page load
     (async () => {
-      // Give extensions a moment to register
-      await new Promise(r => setTimeout(r, 300));
-      const wallet = findAptosWallet();
-      if (wallet && wallet.accounts && wallet.accounts.length > 0) {
-        connectedWallet = wallet;
-        connectedAccount = wallet.accounts[0];
-        walletAddress = connectedAccount.address;
-        document.getElementById("walletAddr").textContent = walletAddress;
-        document.getElementById("walletStatus").style.display = "flex";
-        document.getElementById("walletBtn").textContent = "Disconnect";
-        updateUploadBtn();
+      await new Promise(r => setTimeout(r, 500));
+      const petra = getPetra();
+      if (petra) {
+        try {
+          const connected = await petra.isConnected();
+          if (connected) {
+            const resp = await petra.account();
+            walletAddress = resp.address;
+            document.getElementById("walletTitle").textContent = "Petra Connected";
+            document.getElementById("walletLabel").style.display = "none";
+            document.getElementById("walletAddr").textContent = walletAddress.slice(0, 8) + "..." + walletAddress.slice(-6);
+            document.getElementById("walletAddr").style.display = "";
+            document.getElementById("walletBtn").textContent = "Disconnect";
+          }
+        } catch (_) {}
       }
     })();
 
     /* ───── File Selection ───── */
     let selectedFile = null;
-    const dropzone = document.getElementById("dropzone");
-    const fileInput = document.getElementById("fileInput");
+    const dropzone = document.getElementById("actDropzone");
+    const fileInput = document.getElementById("actFileInput");
 
     dropzone.addEventListener("click", () => fileInput.click());
     dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("active"); });
@@ -290,190 +318,241 @@
       e.preventDefault(); dropzone.classList.remove("active");
       if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
     });
-    fileInput.addEventListener("change", e => {
-      if (e.target.files[0]) selectFile(e.target.files[0]);
-    });
+    fileInput.addEventListener("change", e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
 
     function selectFile(file) {
-      if (!file.type.startsWith("image/")) {
-        showUploadAlert("Only image files are allowed", "error");
-        return;
-      }
+      if (!file.type.startsWith("image/")) { showUploadAlert("Only image files allowed", "error"); return; }
       selectedFile = file;
-      document.getElementById("fileName").textContent = file.name + " (" + (file.size / 1024).toFixed(1) + " KB)";
-      dropzone.innerHTML = '<div class="icon">&#9989;</div><div>' + file.name + '</div>';
-      updateUploadBtn();
+      document.getElementById("actFileName").textContent = file.name + " (" + (file.size / 1024).toFixed(1) + " KB)";
+      dropzone.innerHTML = '<div style="font-size:28px;">&#x2705;</div><div style="font-size:13px;">' + file.name + '</div>';
     }
 
-    function updateUploadBtn() {
-      document.getElementById("uploadBtn").disabled = !(selectedFile && walletAddress);
-    }
-
-    /* ───── Upload Flow ───── */
+    /* ───── Upload / Log Activity ───── */
     function setStep(id, state) {
       const el = document.getElementById(id);
       el.className = "step step-" + state;
-      const statusEl = el.querySelector(".status");
-      if (state === "done") statusEl.textContent = "✓";
-      else if (state === "error") statusEl.textContent = "✗";
-      else if (state === "active") statusEl.innerHTML = '<span class="spinner"></span>';
+      const s = el.querySelector(".status");
+      if (state === "done") s.textContent = "✓";
+      else if (state === "error") s.textContent = "✗";
+      else if (state === "active") s.innerHTML = '<span class="spinner"></span>';
     }
-
     function resetSteps() {
-      ["step-upload","step-commit","step-sign","step-store","step-done"].forEach(id => {
-        setStep(id, "pending");
+      ["step-prepare","step-commit","step-sign","step-store","step-done"].forEach((id, i) => {
         const el = document.getElementById(id);
-        el.querySelector(".status").textContent = el === document.getElementById("step-upload") ? "1"
-          : el === document.getElementById("step-commit") ? "2"
-          : el === document.getElementById("step-sign") ? "3"
-          : el === document.getElementById("step-store") ? "4" : "5";
+        el.className = "step step-pending";
+        el.querySelector(".status").textContent = String(i + 1);
       });
     }
-
     function showUploadAlert(msg, type) {
       const el = document.getElementById("uploadAlert");
       if (!msg) { el.className = "alert mt-8"; el.textContent = ""; return; }
-      el.textContent = msg;
-      el.className = "alert alert-" + type + " mt-8";
+      el.textContent = msg; el.className = "alert alert-" + type + " mt-8";
     }
 
-    async function startUpload() {
-      if (!selectedFile || !walletAddress) return;
+    async function logActivity() {
+      const title = document.getElementById("actTitle").value.trim();
+      if (!title) { showUploadAlert("Enter an activity title", "error"); return; }
+      if (!walletAddress) { showUploadAlert("Connect your Petra wallet first", "error"); return; }
 
-      const folder = document.getElementById("folder").value.trim() || "Unsorted";
-      const uploadBtn = document.getElementById("uploadBtn");
-      const progressEl = document.getElementById("uploadProgress");
+      const btn = document.getElementById("logActivityBtn");
+      const progress = document.getElementById("uploadProgress");
       const txResult = document.getElementById("txResult");
 
-      uploadBtn.disabled = true;
-      progressEl.style.display = "block";
+      btn.disabled = true;
+      progress.style.display = "block";
       txResult.classList.add("hidden");
       showUploadAlert("", "");
       resetSteps();
 
+      // Build activity metadata
+      const activity = {
+        type: selectedType,
+        title: title,
+        distance: parseFloat(document.getElementById("actDistance").value) || 0,
+        duration: parseInt(document.getElementById("actDuration").value) || 0,
+        calories: parseInt(document.getElementById("actCalories").value) || 0,
+        heartRate: parseInt(document.getElementById("actHeartRate").value) || 0,
+        notes: document.getElementById("actNotes").value.trim()
+      };
+
       try {
-        // Step 1: Upload file to server
-        setStep("step-upload", "active");
+        // Step 1: Upload to server
+        setStep("step-prepare", "active");
         const formData = new FormData();
-        formData.append("photo", selectedFile);
-        formData.append("folder", folder);
+        if (selectedFile) formData.append("photo", selectedFile);
+        formData.append("folder", activity.type);
         formData.append("walletAddress", walletAddress);
+        formData.append("activityType", activity.type);
+        formData.append("activityTitle", activity.title);
+        formData.append("activityDistance", activity.distance);
+        formData.append("activityDuration", activity.duration);
+        formData.append("activityCalories", activity.calories);
+        formData.append("activityHeartRate", activity.heartRate);
+        formData.append("activityNotes", activity.notes);
 
-        const prepareRes = await fetch("/upload/prepare", {
-          method: "POST",
-          headers: authHeaders(),
-          body: formData
+        const prepRes = await fetch("/upload/prepare", {
+          method: "POST", headers: authHeaders(), body: formData
         });
-        const prepareData = await prepareRes.json();
-        if (!prepareRes.ok) throw new Error(prepareData.error || "Upload failed");
-        setStep("step-upload", "done");
-
-        // Step 2: Commitments generated (server-side)
+        const prepData = await prepRes.json();
+        if (!prepRes.ok) throw new Error(prepData.error || "Prepare failed");
+        setStep("step-prepare", "done");
         setStep("step-commit", "done");
 
-        // Step 3: Sign transaction in wallet (Aptos Wallet Standard)
+        // Step 3: Sign in Petra
         setStep("step-sign", "active");
-        const txPayload = prepareData.txPayload;
+        const petra = getPetra();
+        if (!petra) throw new Error("Petra wallet not available");
 
-        let txHash;
-        try {
-          const signFeature = connectedWallet.features["aptos:signAndSubmitTransaction"];
-          const result = await signFeature.signAndSubmitTransaction({
-            payload: {
-              function: txPayload.function,
-              functionArguments: txPayload.functionArguments,
-            }
-          });
-          // Handle different response formats across wallet versions
-          txHash = result.hash || (result.args && result.args.hash);
-          if (!txHash) throw new Error("No transaction hash returned");
-        } catch (walletErr) {
-          if (walletErr.message && (walletErr.message.includes("rejected") || walletErr.message.includes("Rejected"))) {
-            throw new Error("Transaction was rejected by the user");
-          }
-          throw new Error("Wallet signing failed: " + walletErr.message);
-        }
+        const txPayload = prepData.txPayload;
+        const pendingTx = await petra.signAndSubmitTransaction({
+          type: "entry_function_payload",
+          function: txPayload.function,
+          arguments: txPayload.functionArguments,
+          type_arguments: []
+        });
+        const txHash = pendingTx.hash || pendingTx;
+        if (!txHash) throw new Error("No transaction hash returned");
         setStep("step-sign", "done");
 
-        // Step 4: Confirm upload with server (server does putBlob to Shelby RPC)
+        // Step 4: Confirm
         setStep("step-store", "active");
-        const confirmRes = await fetch("/upload/confirm", {
+        const confRes = await fetch("/upload/confirm", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({
-            uploadId: prepareData.uploadId,
-            txHash: txHash,
-            blobName: prepareData.blobName
-          })
+          body: JSON.stringify({ uploadId: prepData.uploadId, txHash, blobName: prepData.blobName })
         });
-        const confirmData = await confirmRes.json();
-        if (!confirmRes.ok) throw new Error(confirmData.error || "Confirmation failed");
+        const confData = await confRes.json();
+        if (!confRes.ok) throw new Error(confData.error || "Confirm failed");
         setStep("step-store", "done");
 
-        // Step 5: Done
+        // Done!
         setStep("step-done", "done");
-        showUploadAlert("Upload verified on-chain!", "success");
-
-        // Show transaction link
+        showUploadAlert("Activity logged and verified on-chain!", "success");
         txResult.classList.remove("hidden");
         const txLink = document.getElementById("txLink");
         txLink.href = "https://explorer.aptoslabs.com/txn/" + txHash + "?network=testnet";
         txLink.textContent = txHash;
 
-        // Reset file selection
+        // Reset form
+        document.getElementById("actTitle").value = "";
+        document.getElementById("actDistance").value = "";
+        document.getElementById("actDuration").value = "";
+        document.getElementById("actCalories").value = "";
+        document.getElementById("actHeartRate").value = "";
+        document.getElementById("actNotes").value = "";
         selectedFile = null;
-        document.getElementById("fileName").textContent = "";
-        dropzone.innerHTML = '<div class="icon">&#128247;</div><div>Click or drag a photo here</div>';
+        document.getElementById("actFileName").textContent = "";
+        dropzone.innerHTML = '<div class="icon" style="font-size:28px;">&#x1F4F7;</div><div style="font-size:13px;">Click or drop a photo</div>';
         fileInput.value = "";
-        updateUploadBtn();
+
+        // Refresh stats
+        loadFeed();
+        loadStats();
 
       } catch (err) {
-        const steps = ["step-upload","step-commit","step-sign","step-store","step-done"];
-        const activeStep = steps.find(s => document.getElementById(s).classList.contains("step-active"));
-        if (activeStep) setStep(activeStep, "error");
+        const steps = ["step-prepare","step-commit","step-sign","step-store","step-done"];
+        const active = steps.find(s => document.getElementById(s).classList.contains("step-active"));
+        if (active) setStep(active, "error");
         showUploadAlert(err.message, "error");
       } finally {
-        uploadBtn.disabled = false;
+        btn.disabled = false;
       }
     }
 
-    /* ───── Timeline ───── */
-    async function loadTimeline() {
-      const container = document.getElementById("timelineContainer");
-      container.innerHTML = '<p style="color:var(--text2); font-size:14px;">Loading...</p>';
+    /* ───── Feed ───── */
+    async function loadFeed() {
+      const feedContainer = document.getElementById("feedContainer");
+      const photosContainer = document.getElementById("photosContainer");
 
       try {
         const res = await fetch("/timeline", { headers: authHeaders() });
         const data = await res.json();
-
         if (!res.ok) throw new Error(data.error);
-        if (!data.uploads || data.uploads.length === 0) {
-          container.innerHTML = '<p style="color:var(--text2); font-size:14px;">No uploads yet. Start by uploading a progress photo!</p>';
+
+        const uploads = data.uploads || [];
+        if (uploads.length === 0) {
+          feedContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F3C3;</div><h3>No activities yet</h3><p>Log your first workout to see it here.</p></div>';
+          photosContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F4F8;</div><h3>No photos yet</h3><p>Attach a photo to your next activity.</p></div>';
           return;
         }
 
-        container.innerHTML = data.uploads.map(u => `
-          <div class="timeline-item">
-            <div class="thumb">${u.hasFile ? '<img src="/uploads/temp/' + u.filename + '" alt="">' : '&#128247;'}</div>
-            <div class="info">
-              <h4>${u.folder}</h4>
-              <div class="meta">
-                ${new Date(u.uploadedAt).toLocaleDateString()} &middot; ${(u.size / 1024).toFixed(1)} KB
-                ${u.txHash ? '<br><a href="https://explorer.aptoslabs.com/txn/' + u.txHash + '?network=testnet" target="_blank">View on Aptos Explorer &#x2197;</a>' : ''}
-                ${u.blobId ? '<br><a href="https://api.testnet.shelby.xyz/shelby/v1/blobs/' + (u.walletAddress || '') + '/' + u.blobId + '" target="_blank">View on Shelby &#x2197;</a>' : ''}
+        // Activity feed
+        feedContainer.innerHTML = '<div class="activity-feed">' + uploads.map(u => {
+          const type = u.activityType || u.folder || "workout";
+          const iconClass = (type === "run" ? "run" : type === "ride" ? "ride" : type === "photo" ? "photo" : "workout");
+          const icon = type === "run" ? "&#x1F3C3;" : type === "ride" ? "&#x1F6B4;" : type === "swim" ? "&#x1F3CA;" : type === "yoga" ? "&#x1F9D8;" : type === "workout" ? "&#x1F4AA;" : "&#x2B50;";
+          return `
+            <div class="activity-item">
+              <div class="activity-icon ${iconClass}">${icon}</div>
+              <div class="activity-body">
+                <h4>${u.activityTitle || u.filename}</h4>
+                <div class="activity-meta">
+                  <span>&#x1F4C5; ${new Date(u.uploadedAt).toLocaleDateString()}</span>
+                  ${u.activityDistance ? '<span>&#x1F4CF; ' + u.activityDistance + ' km</span>' : ''}
+                  ${u.activityDuration ? '<span>&#x23F1; ' + u.activityDuration + ' min</span>' : ''}
+                  ${u.activityCalories ? '<span>&#x1F525; ' + u.activityCalories + ' cal</span>' : ''}
+                </div>
+                <div class="activity-badges">
+                  <span class="badge badge-type">${type}</span>
+                  ${u.txHash ? '<span class="badge badge-onchain">&#x1F517; On-Chain</span>' : ''}
+                  ${u.commitment ? '<span class="badge badge-verified">&#x2713; Verified</span>' : '<span class="badge badge-pending">Pending</span>'}
+                </div>
+                ${u.txHash ? '<div class="mt-8"><a href="https://explorer.aptoslabs.com/txn/' + u.txHash + '?network=testnet" target="_blank" class="link">View on Explorer &#x2197;</a></div>' : ''}
               </div>
-              <div class="mt-8">
-                ${u.blobId && u.commitment
-                  ? '<span class="proof-badge proof-verified">&#x2713; Verified On-Chain</span>'
-                  : '<span class="proof-badge proof-unverified">&#x25CB; Unverified</span>'}
+              ${u.hasFile ? '<div class="thumb"><img src="/uploads/temp/' + u.filename + '" alt=""></div>' : ''}
+            </div>`;
+        }).join("") + '</div>';
+
+        // Photos tab (only items with photos)
+        const withPhotos = uploads.filter(u => u.hasFile);
+        if (withPhotos.length === 0) {
+          photosContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">&#x1F4F8;</div><h3>No photos yet</h3><p>Attach a photo to your next activity.</p></div>';
+        } else {
+          photosContainer.innerHTML = '<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:16px;">' +
+            withPhotos.map(u => `
+              <div style="border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); background:var(--bg);">
+                <img src="/uploads/temp/${u.filename}" alt="" style="width:100%; height:180px; object-fit:cover;">
+                <div style="padding:12px;">
+                  <div style="font-size:13px; font-weight:600;">${u.activityTitle || u.folder}</div>
+                  <div style="font-size:11px; color:var(--text2); margin-top:4px;">${new Date(u.uploadedAt).toLocaleDateString()}</div>
+                  ${u.txHash ? '<span class="badge badge-verified mt-4">&#x2713; Verified</span>' : ''}
+                </div>
               </div>
-            </div>
-          </div>
-        `).join("");
+            `).join("") + '</div>';
+        }
       } catch (err) {
-        container.innerHTML = '<p style="color:var(--error); font-size:14px;">Failed to load timeline.</p>';
+        feedContainer.innerHTML = '<p style="color:var(--red);">Failed to load feed.</p>';
       }
     }
+
+    /* ───── Stats ───── */
+    async function loadStats() {
+      try {
+        const res = await fetch("/stats", { headers: authHeaders() });
+        if (!res.ok) return;
+        const s = await res.json();
+        document.getElementById("statActivities").textContent = s.totalActivities || 0;
+        document.getElementById("statDistance").textContent = (s.totalDistance || 0).toFixed(1) + " km";
+        document.getElementById("statOnchain").textContent = s.onChainCount || 0;
+        document.getElementById("statStreak").textContent = s.currentStreak || 0;
+      } catch (_) {}
+    }
+
+    /* ───── Fitness Tips ───── */
+    const tips = [
+      "Consistency beats intensity. Showing up 4x/week beats one extreme session.",
+      "Progressive overload is king. Increase weight, reps, or distance by 5-10% each week.",
+      "Sleep 7-9 hours. Your muscles grow during rest, not during the workout.",
+      "Hydrate! Aim for 3-4 liters of water daily when training.",
+      "Don't skip the warm-up. 5-10 min of dynamic stretching prevents injury.",
+      "Track your protein. Aim for 1.6-2.2g per kg of bodyweight for muscle building.",
+      "Active recovery days (light walking, stretching) are better than full rest days.",
+      "Every workout you log on-chain is permanent proof of your discipline."
+    ];
+    document.getElementById("fitnessTip").textContent = tips[Math.floor(Math.random() * tips.length)];
+
+    /* ───── Init ───── */
+    loadStats();
   </script>
 </body>
 </html>

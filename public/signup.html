@@ -3,17 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign Up - Fitness Proof</title>
+  <title>Sign Up — FitnessProof</title>
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
   <div class="auth-container">
     <div class="auth-card">
+      <a href="/" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--text2);font-size:14px;margin-bottom:24px;">
+        <span style="font-size:20px;">&#x26A1;</span>
+        <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--text);">FitnessProof</span>
+      </a>
       <h1>Create Account</h1>
-      <p class="subtitle">Join Fitness Proof — your progress, verified on-chain.</p>
-
+      <p class="subtitle">Start logging verifiable fitness activity on-chain.</p>
       <div id="alert" class="alert"></div>
-
       <form id="signupForm">
         <div class="form-group">
           <label>Email</label>
@@ -33,59 +35,36 @@
         </div>
         <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Create Account</button>
       </form>
-
       <p class="text-center mt-16">
         <a href="/login.html" class="link">Already have an account? Log in</a>
       </p>
     </div>
   </div>
-
   <script>
+    if (localStorage.getItem("token")) window.location.href = "/dashboard.html";
     const form = document.getElementById("signupForm");
-    const alert = document.getElementById("alert");
+    const alertEl = document.getElementById("alert");
     const submitBtn = document.getElementById("submitBtn");
-
-    function showAlert(msg, type) {
-      alert.textContent = msg;
-      alert.className = "alert alert-" + type;
-    }
-
+    function showAlert(msg, type) { alertEl.textContent = msg; alertEl.className = "alert alert-" + type; }
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = document.getElementById("email").value.trim();
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value;
       const confirmPassword = document.getElementById("confirmPassword").value;
-
-      if (password !== confirmPassword) {
-        showAlert("Passwords do not match", "error");
-        return;
-      }
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Creating account...";
-
+      if (password !== confirmPassword) { showAlert("Passwords do not match", "error"); return; }
+      submitBtn.disabled = true; submitBtn.textContent = "Creating account...";
       try {
         const res = await fetch("/auth/signup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, username, password })
         });
         const data = await res.json();
-
-        if (!res.ok) {
-          showAlert(data.error || "Signup failed", "error");
-          return;
-        }
-
+        if (!res.ok) { showAlert(data.error || "Signup failed", "error"); return; }
         showAlert("Account created! Redirecting...", "success");
         setTimeout(() => window.location.href = "/login.html", 1000);
-      } catch (err) {
-        showAlert("Network error. Please try again.", "error");
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Create Account";
-      }
+      } catch (err) { showAlert("Network error. Please try again.", "error"); }
+      finally { submitBtn.disabled = false; submitBtn.textContent = "Create Account"; }
     });
   </script>
 </body>

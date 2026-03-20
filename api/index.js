@@ -117,7 +117,7 @@ setInterval(() => {
 //  Upload: Step 1 - Prepare 
 // Accepts file, generates Shelby commitments, returns tx payload for wallet signing
 app.post("/upload/prepare", authenticate, upload.single("photo"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No photo uploaded" });
+  // Photo is optional for activity logging
 
   const walletAddress = req.body.walletAddress;
   if (!walletAddress) return res.status(400).json({ error: "Wallet address is required" });
@@ -133,9 +133,26 @@ app.post("/upload/prepare", authenticate, upload.single("photo"), async (req, re
     if (process.env.SHELBY_API_KEY) config.apiKey = process.env.SHELBY_API_KEY;
     const shelbyClient = new ShelbyNodeClient(config);
 
-    // Read file and generate commitments
-    const blobData = fs.readFileSync(req.file.path);
-    const blobName = "fitness-proof/" + req.file.filename;
+    // Build blob data from file or activity JSON
+    let blobData, blobName;
+    if (req.file) {
+      blobData = fs.readFileSync(req.file.path);
+      blobName = "fitness-proof/" + req.file.filename;
+    } else {
+      // No file — create a JSON blob from activity data
+      const activityJson = JSON.stringify({
+        type: req.body.activityType || "workout",
+        title: req.body.activityTitle || "Activity",
+        distance: parseFloat(req.body.activityDistance) || 0,
+        duration: parseInt(req.body.activityDuration) || 0,
+        calories: parseInt(req.body.activityCalories) || 0,
+        heartRate: parseInt(req.body.activityHeartRate) || 0,
+        notes: req.body.activityNotes || "",
+        timestamp: new Date().toISOString()
+      });
+      blobData = Buffer.from(activityJson, "utf-8");
+      blobName = "fitness-proof/activity_" + Date.now() + ".json";
+    }
     const expirationMicros = (1000 * 60 * 60 * 24 * 30 + Date.now()) * 1000; // 30 days
 
     const provider = await shelbyClient.getProvider();
@@ -161,9 +178,9 @@ app.post("/upload/prepare", authenticate, upload.single("photo"), async (req, re
     // Store pending upload data
     const uploadId = crypto.randomBytes(16).toString("hex");
     pendingUploads.set(uploadId, {
-      filePath: req.file.path,
-      filename: req.file.filename,
-      size: req.file.size,
+      filePath: req.file ? req.file.path : null,
+      filename: req.file ? req.file.filename : blobName.split("/").pop(),
+      size: req.file ? req.file.size : blobData.length,
       folder,
       userId: req.user.id,
       walletAddress,
@@ -173,6 +190,13 @@ app.post("/upload/prepare", authenticate, upload.single("photo"), async (req, re
       expirationMicros,
       shelbyClient,
       provider,
+      activityType: req.body.activityType || null,
+      activityTitle: req.body.activityTitle || null,
+      activityDistance: parseFloat(req.body.activityDistance) || 0,
+      activityDuration: parseInt(req.body.activityDuration) || 0,
+      activityCalories: parseInt(req.body.activityCalories) || 0,
+      activityHeartRate: parseInt(req.body.activityHeartRate) || 0,
+      activityNotes: req.body.activityNotes || null,
       createdAt: Date.now()
     });
 
@@ -184,7 +208,7 @@ app.post("/upload/prepare", authenticate, upload.single("photo"), async (req, re
     });
   } catch (err) {
     console.error("Prepare upload error:", err);
-    try { fs.unlinkSync(req.file.path); } catch (_) {}
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch (_) {} }
     res.status(500).json({ error: "Failed to prepare upload: " + err.message });
   }
 });
@@ -216,7 +240,9 @@ app.post("/upload/confirm", authenticate, async (req, res) => {
     // Save to database
     const uploadedAt = new Date().toISOString();
     db.prepare(
-      "INSERT INTO uploads (userId, anonId, folder, filename, size, uploadedAt, blobId, commitment, txHash, walletAddress) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      `INSERT INTO uploads (userId, anonId, folder, filename, size, uploadedAt, blobId, commitment, txHash, walletAddress,
+       activityType, activityTitle, activityDistance, activityDuration, activityCalories, activityHeartRate, activityNotes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       req.user.id,
       req.user.username,
@@ -227,11 +253,18 @@ app.post("/upload/confirm", authenticate, async (req, res) => {
       pending.blobName,
       pending.blobCommitments.blob_merkle_root,
       txHash,
-      pending.walletAddress
+      pending.walletAddress,
+      pending.activityType,
+      pending.activityTitle,
+      pending.activityDistance,
+      pending.activityDuration,
+      pending.activityCalories,
+      pending.activityHeartRate,
+      pending.activityNotes
     );
 
     // Delete local temp file
-    try { fs.unlinkSync(pending.filePath); } catch (_) {}
+    if (pending.filePath) { try { fs.unlinkSync(pending.filePath); } catch (_) {} }
     pendingUploads.delete(uploadId);
 
     res.json({
@@ -273,10 +306,38 @@ app.post("/upload", upload.single("photo"), async (req, res) => {
   res.json({ message: "Photo uploaded", anonId, folder, uploadedAt, storage: storageResult });
 });
 
+//  Stats (authenticated) 
+app.get("/stats", authenticate, (req, res) => {
+  const row = db.prepare(
+    `SELECT COUNT(*) as totalActivities,
+     COALESCE(SUM(activityDistance), 0) as totalDistance,
+     COUNT(CASE WHEN txHash IS NOT NULL THEN 1 END) as onChainCount
+     FROM uploads WHERE userId = ?`
+  ).get(req.user.id);
+
+  // Calculate streak: consecutive days with at least one activity
+  const days = db.prepare(
+    `SELECT DISTINCT DATE(uploadedAt) as d FROM uploads WHERE userId = ? ORDER BY d DESC`
+  ).all(req.user.id).map(r => r.d);
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < days.length; i++) {
+    const expected = new Date(today);
+    expected.setDate(expected.getDate() - i);
+    const expectedStr = expected.toISOString().split("T")[0];
+    if (days[i] === expectedStr) streak++;
+    else break;
+  }
+
+  res.json({ ...row, currentStreak: streak });
+});
+
 //  Timeline (authenticated) 
 app.get("/timeline", authenticate, (req, res) => {
   const rows = db.prepare(
-    "SELECT folder, filename, size, uploadedAt, blobId, commitment, txHash, walletAddress FROM uploads WHERE userId = ? ORDER BY uploadedAt DESC"
+    `SELECT folder, filename, size, uploadedAt, blobId, commitment, txHash, walletAddress,
+     activityType, activityTitle, activityDistance, activityDuration, activityCalories, activityHeartRate, activityNotes
+     FROM uploads WHERE userId = ? ORDER BY uploadedAt DESC`
   ).all(req.user.id);
 
   const uploads = rows.map(row => ({
@@ -288,6 +349,13 @@ app.get("/timeline", authenticate, (req, res) => {
     commitment: row.commitment,
     txHash: row.txHash,
     walletAddress: row.walletAddress,
+    activityType: row.activityType,
+    activityTitle: row.activityTitle,
+    activityDistance: row.activityDistance,
+    activityDuration: row.activityDuration,
+    activityCalories: row.activityCalories,
+    activityHeartRate: row.activityHeartRate,
+    activityNotes: row.activityNotes,
     hasFile: fs.existsSync(path.join(uploadDir, row.filename))
   }));
 
