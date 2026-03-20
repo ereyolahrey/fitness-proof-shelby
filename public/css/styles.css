@@ -75,7 +75,7 @@ body::before {
 .auth-card h1 {
   font-size: 32px; margin-bottom: 8px; font-weight: 800;
   background: linear-gradient(135deg, #fff, var(--accent-light));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .auth-card .subtitle { color: var(--text2); margin-bottom: 32px; font-size: 14px; line-height: 1.5; }
 
@@ -184,7 +184,7 @@ body::before {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 28px; font-weight: 800; line-height: 1;
   background: linear-gradient(135deg, #fff, var(--accent-light));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .stat-card .stat-label {
   font-size: 12px; color: var(--text2); margin-top: 6px;
@@ -327,7 +327,7 @@ a.link:hover { text-decoration: underline; color: var(--neon); }
 .hero h1 {
   font-size: 56px; font-weight: 900; line-height: 1.1; margin-bottom: 20px;
   background: linear-gradient(135deg, #fff 30%, var(--accent-light) 60%, var(--neon) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .hero p { color: var(--text2); font-size: 18px; max-width: 580px; margin: 0 auto 40px; line-height: 1.7; }
 .hero-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
@@ -400,7 +400,7 @@ a.link:hover { text-decoration: underline; color: var(--neon); }
 .page-header h1 {
   font-size: 28px; font-weight: 800;
   background: linear-gradient(135deg, #fff, var(--accent-light));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .page-header p { color: var(--text2); font-size: 14px; margin-top: 6px; }
 
