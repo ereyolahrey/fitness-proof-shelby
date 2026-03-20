@@ -232,51 +232,124 @@
       });
     });
 
-    /* ───── Petra Wallet — Direct API (most reliable) ───── */
+    /* ───── Aptos Wallet Standard Discovery ───── */
     let walletAddress = null;
+    let connectedWallet = null;
+    const discoveredWallets = [];
+    const walletListeners = [];
 
-    function getPetra() {
-      return window.petra || window.aptos;
+    function onWalletDiscovered(cb) {
+      walletListeners.push(cb);
+      return () => { const i = walletListeners.indexOf(cb); if (i >= 0) walletListeners.splice(i, 1); };
+    }
+
+    function registerWallet(w) {
+      if (!discoveredWallets.includes(w)) {
+        discoveredWallets.push(w);
+        walletListeners.forEach(cb => cb(w));
+      }
+    }
+
+    // Listen for wallets that register after we load
+    window.addEventListener("wallet-standard:register-wallet", (e) => {
+      if (typeof e.detail === "function") {
+        e.detail({ register: (...wallets) => wallets.forEach(registerWallet) });
+      }
+    });
+
+    // Announce we're ready — wallets already loaded will register with us
+    try {
+      const readyEv = new CustomEvent("wallet-standard:app-ready");
+      Object.defineProperty(readyEv, "detail", {
+        value: { register: (...wallets) => wallets.forEach(registerWallet) }
+      });
+      window.dispatchEvent(readyEv);
+    } catch (_) {}
+
+    function findPetraWallet() {
+      return discoveredWallets.find(w =>
+        w.name && w.name.toLowerCase().includes("petra") &&
+        w.features && w.features["aptos:connect"] &&
+        w.features["aptos:signAndSubmitTransaction"]
+      );
+    }
+
+    function findAnyAptosWallet() {
+      return discoveredWallets.find(w =>
+        w.features &&
+        w.features["aptos:connect"] &&
+        w.features["aptos:signAndSubmitTransaction"]
+      );
+    }
+
+    function setWalletConnected(addr, name) {
+      walletAddress = addr;
+      document.getElementById("walletTitle").textContent = (name || "Wallet") + " Connected";
+      document.getElementById("walletLabel").style.display = "none";
+      document.getElementById("walletAddr").textContent = addr.slice(0, 8) + "..." + addr.slice(-6);
+      document.getElementById("walletAddr").style.display = "";
+      document.getElementById("walletBtn").textContent = "Disconnect";
+      showWalletAlert("", "");
+      fetch("/auth/wallet", {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ walletAddress: addr })
+      });
+    }
+
+    function setWalletDisconnected() {
+      walletAddress = null;
+      connectedWallet = null;
+      document.getElementById("walletTitle").textContent = "Connect Wallet";
+      document.getElementById("walletLabel").style.display = "";
+      document.getElementById("walletAddr").style.display = "none";
+      document.getElementById("walletBtn").textContent = "Connect";
+      fetch("/auth/wallet", {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ walletAddress: null })
+      });
     }
 
     async function handleWallet() {
-      if (walletAddress) {
-        // Disconnect
-        try { const p = getPetra(); if (p) await p.disconnect(); } catch (_) {}
-        walletAddress = null;
-        document.getElementById("walletTitle").textContent = "Connect Petra Wallet";
-        document.getElementById("walletLabel").style.display = "";
-        document.getElementById("walletAddr").style.display = "none";
-        document.getElementById("walletBtn").textContent = "Connect";
-        await fetch("/auth/wallet", {
-          method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ walletAddress: null })
-        });
+      // Disconnect
+      if (walletAddress && connectedWallet) {
+        try {
+          const disc = connectedWallet.features["aptos:disconnect"];
+          if (disc) await disc.disconnect();
+        } catch (_) {}
+        setWalletDisconnected();
         return;
       }
 
-      const petra = getPetra();
-      if (!petra) {
-        showWalletAlert("Petra wallet not detected. Install it from petra.app", "error");
+      // Try Petra first, then any Aptos wallet
+      let wallet = findPetraWallet() || findAnyAptosWallet();
+
+      // Wait briefly for late-loading extensions
+      if (!wallet) {
+        wallet = await new Promise(resolve => {
+          const unsub = onWalletDiscovered(w => {
+            if (w.features && w.features["aptos:connect"] && w.features["aptos:signAndSubmitTransaction"]) {
+              unsub(); resolve(w);
+            }
+          });
+          setTimeout(() => { unsub(); resolve(null); }, 2000);
+        });
+      }
+
+      if (!wallet) {
+        showWalletAlert("No Aptos wallet found. Install Petra from petra.app", "error");
         window.open("https://petra.app", "_blank");
         return;
       }
 
       try {
-        const resp = await petra.connect();
-        walletAddress = resp.address;
-        document.getElementById("walletTitle").textContent = "Petra Connected";
-        document.getElementById("walletLabel").style.display = "none";
-        document.getElementById("walletAddr").textContent = walletAddress.slice(0, 8) + "..." + walletAddress.slice(-6);
-        document.getElementById("walletAddr").style.display = "";
-        document.getElementById("walletBtn").textContent = "Disconnect";
-        showWalletAlert("", "");
-        await fetch("/auth/wallet", {
-          method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ walletAddress })
-        });
+        const connectFeature = wallet.features["aptos:connect"];
+        const result = await connectFeature.connect();
+        const accounts = result.accounts || [];
+        if (accounts.length === 0) { showWalletAlert("No accounts returned from wallet.", "error"); return; }
+        connectedWallet = wallet;
+        setWalletConnected(accounts[0].address, wallet.name);
       } catch (err) {
-        showWalletAlert("Wallet connection failed: " + err.message, "error");
+        showWalletAlert("Connection failed: " + err.message, "error");
       }
     }
 
@@ -288,21 +361,11 @@
 
     // Auto-reconnect on page load
     (async () => {
-      await new Promise(r => setTimeout(r, 500));
-      const petra = getPetra();
-      if (petra) {
-        try {
-          const connected = await petra.isConnected();
-          if (connected) {
-            const resp = await petra.account();
-            walletAddress = resp.address;
-            document.getElementById("walletTitle").textContent = "Petra Connected";
-            document.getElementById("walletLabel").style.display = "none";
-            document.getElementById("walletAddr").textContent = walletAddress.slice(0, 8) + "..." + walletAddress.slice(-6);
-            document.getElementById("walletAddr").style.display = "";
-            document.getElementById("walletBtn").textContent = "Disconnect";
-          }
-        } catch (_) {}
+      await new Promise(r => setTimeout(r, 800));
+      const wallet = findPetraWallet() || findAnyAptosWallet();
+      if (wallet && wallet.accounts && wallet.accounts.length > 0) {
+        connectedWallet = wallet;
+        setWalletConnected(wallet.accounts[0].address, wallet.name);
       }
     })();
 
@@ -398,19 +461,20 @@
         setStep("step-prepare", "done");
         setStep("step-commit", "done");
 
-        // Step 3: Sign in Petra
+        // Step 3: Sign via Wallet Standard
         setStep("step-sign", "active");
-        const petra = getPetra();
-        if (!petra) throw new Error("Petra wallet not available");
+        if (!connectedWallet) throw new Error("Wallet not connected");
+        const signFeature = connectedWallet.features["aptos:signAndSubmitTransaction"];
+        if (!signFeature) throw new Error("Wallet does not support signing");
 
         const txPayload = prepData.txPayload;
-        const pendingTx = await petra.signAndSubmitTransaction({
-          type: "entry_function_payload",
-          function: txPayload.function,
-          arguments: txPayload.functionArguments,
-          type_arguments: []
+        const pendingTx = await signFeature.signAndSubmitTransaction({
+          payload: {
+            function: txPayload.function,
+            functionArguments: txPayload.functionArguments
+          }
         });
-        const txHash = pendingTx.hash || pendingTx;
+        const txHash = pendingTx.hash || (pendingTx.args && pendingTx.args.hash) || pendingTx;
         if (!txHash) throw new Error("No transaction hash returned");
         setStep("step-sign", "done");
 
