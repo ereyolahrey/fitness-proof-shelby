@@ -387,7 +387,11 @@
       if (!file.type.startsWith("image/")) { showUploadAlert("Only image files allowed", "error"); return; }
       selectedFile = file;
       document.getElementById("actFileName").textContent = file.name + " (" + (file.size / 1024).toFixed(1) + " KB)";
-      dropzone.innerHTML = '<div style="font-size:28px;">&#x2705;</div><div style="font-size:13px;">' + file.name + '</div>';
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        dropzone.innerHTML = '<img src="' + e.target.result + '" style="max-height:120px; max-width:100%; border-radius:8px; object-fit:cover;"><div style="font-size:12px; margin-top:6px; color:var(--text2);">' + file.name + '</div>';
+      };
+      reader.readAsDataURL(file);
     }
 
     /* ───── Upload / Log Activity ───── */
@@ -543,8 +547,9 @@
         // Activity feed
         feedContainer.innerHTML = '<div class="activity-feed">' + uploads.map(u => {
           const type = u.activityType || u.folder || "workout";
-          const iconClass = (type === "run" ? "run" : type === "ride" ? "ride" : type === "photo" ? "photo" : "workout");
-          const icon = type === "run" ? "&#x1F3C3;" : type === "ride" ? "&#x1F6B4;" : type === "swim" ? "&#x1F3CA;" : type === "yoga" ? "&#x1F9D8;" : type === "workout" ? "&#x1F4AA;" : "&#x2B50;";
+          const iconMap = { run: "&#x1F3C3;", ride: "&#x1F6B4;", swim: "&#x1F3CA;", yoga: "&#x1F9D8;", workout: "&#x1F4AA;", other: "&#x2B50;" };
+          const icon = iconMap[type] || iconMap.other;
+          const iconClass = type;
           return `
             <div class="activity-item">
               <div class="activity-icon ${iconClass}">${icon}</div>
@@ -617,6 +622,7 @@
 
     /* ───── Init ───── */
     loadStats();
+    loadFeed();
   </script>
 </body>
 </html>
