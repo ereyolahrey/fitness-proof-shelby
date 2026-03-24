@@ -1,15 +1,8 @@
 const Database = require("better-sqlite3");
 const path = require("path");
-const fs = require("fs");
 
-// Use persistent disk in production (DATA_DIR env), local dir otherwise
-const dataDir = process.env.DATA_DIR || __dirname;
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-const dbPath = path.join(dataDir, "fitness-proof.db");
+const dbPath = path.join(__dirname, "fitness-proof.db");
 const db = new Database(dbPath);
-console.log("Database path:", dbPath);
 
 // Create uploads table if it doesn't exist
 db.prepare(`

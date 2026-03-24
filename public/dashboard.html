@@ -377,10 +377,11 @@
         try {
           const disc = wallet.features["aptos:disconnect"];
           if (disc) await disc.disconnect();
+          await new Promise(r => setTimeout(r, 300)); // let wallet settle
         } catch (_) {}
 
         const result = await connectFeature.connect();
-        const accounts = result.accounts || [];
+        const accounts = result.accounts || (result.output ? result.output.accounts : []) || [];
         if (accounts.length === 0) { showWalletAlert("No accounts returned from wallet.", "error"); return; }
         connectedWallet = wallet;
         setWalletConnected(accounts[0].address, wallet.name);
@@ -400,10 +401,24 @@
       if (localStorage.getItem("walletDisconnected") === "true") return;
       await new Promise(r => setTimeout(r, 800));
       const wallet = findPetraWallet() || findAnyAptosWallet();
-      if (wallet && wallet.accounts && wallet.accounts.length > 0) {
+      if (!wallet) return;
+      // Check if wallet already exposes connected accounts
+      if (wallet.accounts && wallet.accounts.length > 0) {
         connectedWallet = wallet;
         setWalletConnected(wallet.accounts[0].address, wallet.name);
+        return;
       }
+      // Otherwise try a silent connect
+      try {
+        const connectFeature = wallet.features["aptos:connect"];
+        if (!connectFeature) return;
+        const result = await connectFeature.connect();
+        const accounts = result.accounts || (result.output ? result.output.accounts : []) || [];
+        if (accounts.length > 0) {
+          connectedWallet = wallet;
+          setWalletConnected(accounts[0].address, wallet.name);
+        }
+      } catch (_) { /* silent fail on auto-reconnect */ }
     })();
 
     /* ───── File Selection ───── */

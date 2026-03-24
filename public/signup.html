@@ -75,8 +75,16 @@
         });
         const data = await res.json();
         if (!res.ok) { showAlert(data.error || "Signup failed", "error"); return; }
-        showAlert("Account created! Redirecting...", "success");
-        setTimeout(() => window.location.href = "/login.html", 1000);
+        // Auto-login: server returns token directly from signup
+        if (data.token) {
+          localStorage.setItem("token", data.token);
+          localStorage.setItem("user", JSON.stringify(data.user));
+          showAlert("Account created! Redirecting...", "success");
+          setTimeout(() => window.location.href = "/dashboard.html", 500);
+        } else {
+          showAlert("Account created! Redirecting...", "success");
+          setTimeout(() => window.location.href = "/login.html", 1000);
+        }
       } catch (err) { showAlert("Network error. Please try again.", "error"); }
       finally { submitBtn.disabled = false; submitBtn.textContent = "Create Account"; }
     });

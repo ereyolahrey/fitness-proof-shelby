@@ -16,15 +16,24 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 app.use(express.json());
+
+// Prevent browser caching of HTML files so fixes are always served
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path === '/') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 //  Upload directory 
-const dataDir = process.env.DATA_DIR || path.join(__dirname, "..");
-const uploadDir = path.join(dataDir, "uploads", "temp");
+const uploadDir = path.join(__dirname, "..", "uploads", "temp");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
-app.use("/uploads", express.static(path.join(dataDir, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 //  Multer config 
 const storage = multer.diskStorage({
@@ -71,7 +80,14 @@ app.post("/auth/signup", async (req, res) => {
     db.prepare(
       "INSERT INTO users (email, username, passwordHash, createdAt) VALUES (?, ?, ?, ?)"
     ).run(email.trim(), username.trim(), passwordHash, new Date().toISOString());
-    res.json({ message: "Account created" });
+    // Auto-login: return token directly so user doesn't need to visit login page
+    const newUser = db.prepare("SELECT * FROM users WHERE email = ?").get(email.trim());
+    const token = jwt.sign({ id: newUser.id, email: newUser.email, username: newUser.username }, JWT_SECRET, { expiresIn: "7d" });
+    res.json({
+      message: "Account created",
+      token,
+      user: { id: newUser.id, email: newUser.email, username: newUser.username, walletAddress: newUser.walletAddress || null }
+    });
   } catch (err) {
     if (err.message.includes("UNIQUE")) {
       return res.status(400).json({ error: "Email or username already exists" });
