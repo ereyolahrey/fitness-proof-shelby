@@ -275,8 +275,7 @@ app.post("/upload/confirm", authenticate, async (req, res) => {
       pending.activityNotes
     );
 
-    // Delete local temp file
-    if (pending.filePath) { try { fs.unlinkSync(pending.filePath); } catch (_) {} }
+    // Keep local photo file on persistent disk for progress photo display
     pendingUploads.delete(uploadId);
 
     res.json({
