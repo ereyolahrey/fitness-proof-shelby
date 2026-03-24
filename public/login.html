@@ -33,7 +33,22 @@
     </div>
   </div>
   <script>
-    if (localStorage.getItem("token")) window.location.href = "/dashboard.html";
+    // Validate existing token before redirecting — if token is stale/invalid, clear it
+    (async () => {
+      const token = localStorage.getItem("token");
+      if (token) {
+        try {
+          const res = await fetch("/auth/validate", { headers: { "Authorization": "Bearer " + token } });
+          if (res.ok) {
+            window.location.href = "/dashboard.html";
+            return;
+          }
+        } catch (_) {}
+        // Token is invalid or server is unreachable — clear stale session
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
+    })();
     const form = document.getElementById("loginForm");
     const alertEl = document.getElementById("alert");
     const submitBtn = document.getElementById("submitBtn");

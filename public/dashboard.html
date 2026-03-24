@@ -207,9 +207,33 @@
 
     function logout() {
       localStorage.removeItem("token"); localStorage.removeItem("user");
+      localStorage.removeItem("walletDisconnected");
       window.location.href = "/login.html";
     }
     function authHeaders() { return { "Authorization": "Bearer " + token }; }
+
+    // Handle 401 from any API call — token is stale/invalid, force re-login
+    function handleAuthError(res) {
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login.html";
+        return true;
+      }
+      return false;
+    }
+
+    // Validate token on dashboard load — if server restarted or DB was lost, redirect to login
+    (async () => {
+      try {
+        const res = await fetch("/auth/validate", { headers: authHeaders() });
+        if (!res.ok) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          window.location.href = "/login.html";
+        }
+      } catch (_) {}
+    })();
 
     /* ───── Tabs ───── */
     document.querySelectorAll(".tab").forEach(tab => {
@@ -284,6 +308,7 @@
 
     function setWalletConnected(addr, name) {
       walletAddress = addr;
+      localStorage.removeItem("walletDisconnected");
       document.getElementById("walletTitle").textContent = (name || "Wallet") + " Connected";
       document.getElementById("walletLabel").style.display = "none";
       document.getElementById("walletAddr").textContent = addr.slice(0, 8) + "..." + addr.slice(-6);
@@ -299,6 +324,7 @@
     function setWalletDisconnected() {
       walletAddress = null;
       connectedWallet = null;
+      localStorage.setItem("walletDisconnected", "true");
       document.getElementById("walletTitle").textContent = "Connect Wallet";
       document.getElementById("walletLabel").style.display = "";
       document.getElementById("walletAddr").style.display = "none";
@@ -319,6 +345,9 @@
         setWalletDisconnected();
         return;
       }
+
+      // Clear the intentional disconnect flag since user is explicitly connecting
+      localStorage.removeItem("walletDisconnected");
 
       // Try Petra first, then any Aptos wallet
       let wallet = findPetraWallet() || findAnyAptosWallet();
@@ -343,6 +372,13 @@
 
       try {
         const connectFeature = wallet.features["aptos:connect"];
+
+        // Disconnect first to reset wallet extension state, then reconnect
+        try {
+          const disc = wallet.features["aptos:disconnect"];
+          if (disc) await disc.disconnect();
+        } catch (_) {}
+
         const result = await connectFeature.connect();
         const accounts = result.accounts || [];
         if (accounts.length === 0) { showWalletAlert("No accounts returned from wallet.", "error"); return; }
@@ -359,8 +395,9 @@
       el.textContent = msg; el.className = "alert alert-" + type;
     }
 
-    // Auto-reconnect on page load
+    // Auto-reconnect on page load (only if user didn't intentionally disconnect)
     (async () => {
+      if (localStorage.getItem("walletDisconnected") === "true") return;
       await new Promise(r => setTimeout(r, 800));
       const wallet = findPetraWallet() || findAnyAptosWallet();
       if (wallet && wallet.accounts && wallet.accounts.length > 0) {
@@ -534,6 +571,7 @@
 
       try {
         const res = await fetch("/timeline", { headers: authHeaders() });
+        if (handleAuthError(res)) return;
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
@@ -598,6 +636,7 @@
     async function loadStats() {
       try {
         const res = await fetch("/stats", { headers: authHeaders() });
+        if (handleAuthError(res)) return;
         if (!res.ok) return;
         const s = await res.json();
         document.getElementById("statActivities").textContent = s.totalActivities || 0;

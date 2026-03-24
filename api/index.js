@@ -9,17 +9,22 @@ const bcrypt = require("bcryptjs");
 const db = require("../db/database");
 
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
+if (!process.env.JWT_SECRET) {
+  console.warn("WARNING: JWT_SECRET not set in environment. A random secret was generated.");
+  console.warn("All tokens will be invalidated on server restart. Set JWT_SECRET in your .env file.");
+}
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..", "public")));
-app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 //  Upload directory 
-const uploadDir = path.join(__dirname, "..", "uploads", "temp");
+const dataDir = process.env.DATA_DIR || path.join(__dirname, "..");
+const uploadDir = path.join(dataDir, "uploads", "temp");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
+app.use("/uploads", express.static(path.join(dataDir, "uploads")));
 
 //  Multer config 
 const storage = multer.diskStorage({
@@ -65,7 +70,7 @@ app.post("/auth/signup", async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     db.prepare(
       "INSERT INTO users (email, username, passwordHash, createdAt) VALUES (?, ?, ?, ?)"
-    ).run(email, username, passwordHash, new Date().toISOString());
+    ).run(email.trim(), username.trim(), passwordHash, new Date().toISOString());
     res.json({ message: "Account created" });
   } catch (err) {
     if (err.message.includes("UNIQUE")) {
@@ -81,7 +86,7 @@ app.post("/auth/login", async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.trim());
   if (!user) return res.status(400).json({ error: "User not found" });
 
   const match = await bcrypt.compare(password, user.passwordHash);
@@ -92,6 +97,13 @@ app.post("/auth/login", async (req, res) => {
     token,
     user: { id: user.id, email: user.email, username: user.username, walletAddress: user.walletAddress }
   });
+});
+
+// Token validation endpoint — lets frontend check if stored token is still valid
+app.get("/auth/validate", authenticate, (req, res) => {
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  if (!user) return res.status(401).json({ error: "User no longer exists" });
+  res.json({ valid: true, user: { id: user.id, email: user.email, username: user.username, walletAddress: user.walletAddress || null } });
 });
 
 app.post("/auth/wallet", authenticate, (req, res) => {

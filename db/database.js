@@ -1,8 +1,15 @@
 const Database = require("better-sqlite3");
 const path = require("path");
+const fs = require("fs");
 
-const dbPath = path.join(__dirname, "fitness-proof.db");
+// Use persistent disk in production (DATA_DIR env), local dir otherwise
+const dataDir = process.env.DATA_DIR || __dirname;
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+const dbPath = path.join(dataDir, "fitness-proof.db");
 const db = new Database(dbPath);
+console.log("Database path:", dbPath);
 
 // Create uploads table if it doesn't exist
 db.prepare(`
@@ -39,6 +46,9 @@ addColumnSafe("uploads", "commitment", "TEXT");
 addColumnSafe("uploads", "txHash", "TEXT");
 addColumnSafe("uploads", "walletAddress", "TEXT");
 addColumnSafe("uploads", "userId", "INTEGER");
+
+// Users table migrations
+addColumnSafe("users", "walletAddress", "TEXT");
 
 // Activity metadata columns
 addColumnSafe("uploads", "activityType", "TEXT");
