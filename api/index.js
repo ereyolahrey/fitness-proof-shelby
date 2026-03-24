@@ -6,7 +6,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const db = require("../db/database");
+const { db, initDatabase } = require("../db/database");
 
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
 if (!process.env.JWT_SECRET) {
@@ -77,11 +77,12 @@ app.post("/auth/signup", async (req, res) => {
   }
   try {
     const passwordHash = await bcrypt.hash(password, 10);
-    db.prepare(
-      "INSERT INTO users (email, username, passwordHash, createdAt) VALUES (?, ?, ?, ?)"
-    ).run(email.trim(), username.trim(), passwordHash, new Date().toISOString());
+    await db.run(
+      "INSERT INTO users (email, username, passwordHash, createdAt) VALUES (?, ?, ?, ?)",
+      [email.trim(), username.trim(), passwordHash, new Date().toISOString()]
+    );
     // Auto-login: return token directly so user doesn't need to visit login page
-    const newUser = db.prepare("SELECT * FROM users WHERE email = ?").get(email.trim());
+    const newUser = await db.get("SELECT * FROM users WHERE email = ?", [email.trim()]);
     const token = jwt.sign({ id: newUser.id, email: newUser.email, username: newUser.username }, JWT_SECRET, { expiresIn: "7d" });
     res.json({
       message: "Account created",
@@ -102,7 +103,7 @@ app.post("/auth/login", async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.trim());
+  const user = await db.get("SELECT * FROM users WHERE email = ?", [email.trim()]);
   if (!user) return res.status(400).json({ error: "User not found" });
 
   const match = await bcrypt.compare(password, user.passwordHash);
@@ -116,15 +117,15 @@ app.post("/auth/login", async (req, res) => {
 });
 
 // Token validation endpoint — lets frontend check if stored token is still valid
-app.get("/auth/validate", authenticate, (req, res) => {
-  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+app.get("/auth/validate", authenticate, async (req, res) => {
+  const user = await db.get("SELECT * FROM users WHERE id = ?", [req.user.id]);
   if (!user) return res.status(401).json({ error: "User no longer exists" });
   res.json({ valid: true, user: { id: user.id, email: user.email, username: user.username, walletAddress: user.walletAddress || null } });
 });
 
-app.post("/auth/wallet", authenticate, (req, res) => {
+app.post("/auth/wallet", authenticate, async (req, res) => {
   const { walletAddress } = req.body;
-  db.prepare("UPDATE users SET walletAddress = ? WHERE id = ?").run(walletAddress || null, req.user.id);
+  await db.run("UPDATE users SET walletAddress = ? WHERE id = ?", [walletAddress || null, req.user.id]);
   res.json({ message: "Wallet updated" });
 });
 
@@ -267,28 +268,29 @@ app.post("/upload/confirm", authenticate, async (req, res) => {
 
     // Save to database
     const uploadedAt = new Date().toISOString();
-    db.prepare(
+    await db.run(
       `INSERT INTO uploads (userId, anonId, folder, filename, size, uploadedAt, blobId, commitment, txHash, walletAddress,
        activityType, activityTitle, activityDistance, activityDuration, activityCalories, activityHeartRate, activityNotes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      req.user.id,
-      req.user.username,
-      pending.folder,
-      pending.filename,
-      pending.size,
-      uploadedAt,
-      pending.blobName,
-      pending.blobCommitments.blob_merkle_root,
-      txHash,
-      pending.walletAddress,
-      pending.activityType,
-      pending.activityTitle,
-      pending.activityDistance,
-      pending.activityDuration,
-      pending.activityCalories,
-      pending.activityHeartRate,
-      pending.activityNotes
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.id,
+        req.user.username,
+        pending.folder,
+        pending.filename,
+        pending.size,
+        uploadedAt,
+        pending.blobName,
+        pending.blobCommitments.blob_merkle_root,
+        txHash,
+        pending.walletAddress,
+        pending.activityType,
+        pending.activityTitle,
+        pending.activityDistance,
+        pending.activityDuration,
+        pending.activityCalories,
+        pending.activityHeartRate,
+        pending.activityNotes
+      ]
     );
 
     // Keep local photo file on persistent disk for progress photo display
@@ -326,26 +328,30 @@ app.post("/upload", upload.single("photo"), async (req, res) => {
     try { fs.unlinkSync(req.file.path); } catch (_) {}
   }
 
-  db.prepare(
-    "INSERT INTO uploads (anonId, folder, filename, size, uploadedAt, blobId, commitment) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(anonId, folder, req.file.filename, req.file.size, uploadedAt, storageResult.blobId || null, storageResult.commitment || null);
+  await db.run(
+    "INSERT INTO uploads (anonId, folder, filename, size, uploadedAt, blobId, commitment) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [anonId, folder, req.file.filename, req.file.size, uploadedAt, storageResult.blobId || null, storageResult.commitment || null]
+  );
 
   res.json({ message: "Photo uploaded", anonId, folder, uploadedAt, storage: storageResult });
 });
 
 //  Stats (authenticated) 
-app.get("/stats", authenticate, (req, res) => {
-  const row = db.prepare(
+app.get("/stats", authenticate, async (req, res) => {
+  const row = await db.get(
     `SELECT COUNT(*) as totalActivities,
      COALESCE(SUM(activityDistance), 0) as totalDistance,
      COUNT(CASE WHEN txHash IS NOT NULL THEN 1 END) as onChainCount
-     FROM uploads WHERE userId = ?`
-  ).get(req.user.id);
+     FROM uploads WHERE userId = ?`,
+    [req.user.id]
+  );
 
   // Calculate streak: consecutive days with at least one activity
-  const days = db.prepare(
-    `SELECT DISTINCT DATE(uploadedAt) as d FROM uploads WHERE userId = ? ORDER BY d DESC`
-  ).all(req.user.id).map(r => r.d);
+  const daysRows = await db.all(
+    `SELECT DISTINCT DATE(uploadedAt) as d FROM uploads WHERE userId = ? ORDER BY d DESC`,
+    [req.user.id]
+  );
+  const days = daysRows.map(r => r.d);
   let streak = 0;
   const today = new Date();
   for (let i = 0; i < days.length; i++) {
@@ -360,12 +366,13 @@ app.get("/stats", authenticate, (req, res) => {
 });
 
 //  Timeline (authenticated) 
-app.get("/timeline", authenticate, (req, res) => {
-  const rows = db.prepare(
+app.get("/timeline", authenticate, async (req, res) => {
+  const rows = await db.all(
     `SELECT folder, filename, size, uploadedAt, blobId, commitment, txHash, walletAddress,
      activityType, activityTitle, activityDistance, activityDuration, activityCalories, activityHeartRate, activityNotes
-     FROM uploads WHERE userId = ? ORDER BY uploadedAt DESC`
-  ).all(req.user.id);
+     FROM uploads WHERE userId = ? ORDER BY uploadedAt DESC`,
+    [req.user.id]
+  );
 
   const uploads = rows.map(row => ({
     folder: row.folder,
@@ -390,18 +397,20 @@ app.get("/timeline", authenticate, (req, res) => {
 });
 
 //  Legacy timeline (by anonId) 
-app.get("/timeline/:anonId", (req, res) => {
-  const rows = db.prepare(
-    "SELECT folder, filename, size, uploadedAt, blobId, commitment, txHash FROM uploads WHERE anonId = ? ORDER BY uploadedAt ASC"
-  ).all(req.params.anonId);
+app.get("/timeline/:anonId", async (req, res) => {
+  const rows = await db.all(
+    "SELECT folder, filename, size, uploadedAt, blobId, commitment, txHash FROM uploads WHERE anonId = ? ORDER BY uploadedAt ASC",
+    [req.params.anonId]
+  );
   res.json({ anonId: req.params.anonId, uploads: rows });
 });
 
 //  Verify route 
-app.get("/verify/:blobId", (req, res) => {
-  const row = db.prepare(
-    "SELECT anonId, folder, filename, uploadedAt, blobId, commitment, txHash FROM uploads WHERE blobId = ?"
-  ).get(req.params.blobId);
+app.get("/verify/:blobId", async (req, res) => {
+  const row = await db.get(
+    "SELECT anonId, folder, filename, uploadedAt, blobId, commitment, txHash FROM uploads WHERE blobId = ?",
+    [req.params.blobId]
+  );
   if (!row) return res.status(404).json({ status: "not_found" });
   res.json({
     status: row.commitment ? "verified" : "unverified",
@@ -414,13 +423,21 @@ app.get("/verify/:blobId", (req, res) => {
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
 //  Debug 
-app.get("/debug/uploads", (req, res) => {
-  res.json(db.prepare("SELECT * FROM uploads").all());
+app.get("/debug/uploads", async (req, res) => {
+  const rows = await db.all("SELECT * FROM uploads");
+  res.json(rows);
 });
 
 //  Start 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Fitness Proof server running on http://localhost:" + PORT);
-  console.log("Storage provider:", process.env.STORAGE_PROVIDER || "local");
+
+// Initialize database then start server
+initDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log("Fitness Proof server running on http://localhost:" + PORT);
+    console.log("Storage provider:", process.env.STORAGE_PROVIDER || "local");
+  });
+}).catch(err => {
+  console.error("Failed to initialize database:", err);
+  process.exit(1);
 });
