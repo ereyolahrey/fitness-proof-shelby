@@ -21,11 +21,11 @@ function prepareSql(sql) {
 
 // ── Backend setup ──
 
-let pgQuery, libsqlClient;
+let pgSql, libsqlClient;
 
 if (isPostgres) {
   const { neon } = require("@neondatabase/serverless");
-  pgQuery = neon(process.env.DATABASE_URL, { fullResults: true });
+  pgSql = neon(process.env.DATABASE_URL, { fullResults: true });
 } else {
   const { createClient } = require("@libsql/client");
   libsqlClient = createClient({ url: "file:db/fitness-proof.db" });
@@ -33,7 +33,8 @@ if (isPostgres) {
 
 async function rawQuery(sql, params = []) {
   if (isPostgres) {
-    return pgQuery(sql, params);
+    // Use .query() for conventional parameterized queries ($1, $2, ...)
+    return pgSql.query(sql, params);
   }
   return libsqlClient.execute({ sql, args: params });
 }
