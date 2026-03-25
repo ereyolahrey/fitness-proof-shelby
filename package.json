@@ -10,6 +10,7 @@
   "dependencies": {
     "@aptos-labs/ts-sdk": "^5.2.1",
     "@libsql/client": "^0.17.2",
+    "@neondatabase/serverless": "^1.0.2",
     "@shelby-protocol/sdk": "^0.2.4",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",

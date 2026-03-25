@@ -10,9 +10,7 @@ services:
         value: production
       - key: JWT_SECRET
         sync: false
-      - key: TURSO_DATABASE_URL
-        sync: false
-      - key: TURSO_AUTH_TOKEN
+      - key: DATABASE_URL
         sync: false
       - key: STORAGE_PROVIDER
         value: shelby

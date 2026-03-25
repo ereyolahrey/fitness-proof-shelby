@@ -90,7 +90,7 @@ app.post("/auth/signup", async (req, res) => {
       user: { id: newUser.id, email: newUser.email, username: newUser.username, walletAddress: newUser.walletAddress || null }
     });
   } catch (err) {
-    if (err.message.includes("UNIQUE")) {
+    if (err.message.toLowerCase().includes("unique")) {
       return res.status(400).json({ error: "Email or username already exists" });
     }
     console.error(err);
@@ -348,7 +348,7 @@ app.get("/stats", authenticate, async (req, res) => {
 
   // Calculate streak: consecutive days with at least one activity
   const daysRows = await db.all(
-    `SELECT DISTINCT DATE(uploadedAt) as d FROM uploads WHERE userId = ? ORDER BY d DESC`,
+    `SELECT DISTINCT SUBSTR(uploadedAt, 1, 10) as d FROM uploads WHERE userId = ? ORDER BY d DESC`,
     [req.user.id]
   );
   const days = daysRows.map(r => r.d);
